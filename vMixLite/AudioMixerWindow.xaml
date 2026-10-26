@@ -1,0 +1,456 @@
+<Window x:Class="Cutlance.AudioMixerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="音频混音台 · 八路音频采集与主次" Height="700" Width="950"
+        WindowStartupLocation="CenterOwner"
+        Style="{StaticResource AppWindow}">
+  <Window.Resources>
+    <Style x:Key="FxBtn" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+      <Setter Property="Background" Value="{DynamicResource Brush.Bg.Raised}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Bg.StatusBar}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Padding" Value="10,4"/>
+      <Setter Property="Margin" Value="4,0,0,0"/>
+    </Style>
+    <Style x:Key="ChBox" TargetType="Border">
+      <Setter Property="Background" Value="{DynamicResource Brush.Bg.Overlay}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="3"/>
+      <Setter Property="Padding" Value="8,6"/>
+      <Setter Property="Margin" Value="0,0,0,8"/>
+    </Style>
+    <Style x:Key="Lbl" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+      <Setter Property="FontSize" Value="12"/>
+    </Style>
+    <!-- ⚠ 必须 BasedOn 主题里的隐式 ComboBox 样式：
+         带 key 的 Style 会**整体取代**隐式样式（不是叠加），少了这一句，
+         这个下拉框就退回 WPF 浅色默认模板 —— 白底黑字，跟整个混音台格格不入。 -->
+    <Style x:Key="RoleBox" TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+      <Setter Property="Background" Value="{DynamicResource Brush.Bg.Surface}"/>
+      <Setter Property="Margin" Value="6,0,4,0"/>
+      <Setter Property="ToolTip" Value="角色档决定这一路的基准音量：主音 0dB（说话/主唱）、次音 -8dB（陪衬/副麦）、背景 -14dB（音乐/环境声）。右侧滑杆在此之上微调。"/>
+    </Style>
+    <!-- 音量最小处的一键关闭：贴在滑杆左端，紧急情况（啸叫/串音/爆音）点一下就断这一路 -->
+    <Style x:Key="PwrBtn" TargetType="ToggleButton">
+      <Setter Property="Width" Value="38"/>
+      <Setter Property="Height" Value="24"/>
+      <Setter Property="Margin" Value="0,0,2,0"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+      <Setter Property="FontSize" Value="11"/>
+      <Setter Property="Content" Value="关"/>
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}"/>
+      <Setter Property="Background" Value="{DynamicResource Brush.Bg.Raised}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="ToolTip" Value="一键关掉这一路（啸叫、串音、突然爆音时用）。再点一次恢复。"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ToggleButton">
+            <Border x:Name="bd" Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="3">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="bd" Property="Opacity" Value="0.85"/>
+              </Trigger>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="bd" Property="Background" Value="#C0392B"/>
+                <Setter TargetName="bd" Property="BorderBrush" Value="#E74C3C"/>
+                <Setter Property="Foreground" Value="White"/>
+                <Setter Property="FontWeight" Value="Bold"/>
+                <Setter Property="Content" Value="已关"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </Window.Resources>
+
+  <DockPanel Margin="14">
+    <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Foreground="{DynamicResource Brush.Text.Muted}" FontSize="11"
+               Text="采集卡同时送进多路信号时，各路电平天然不一样。先给每一路选「角色档」定主次（主音 0dB / 次音 -8dB / 背景 -14dB），再用右侧滑杆微调，最终数值看 dB 栏。滑杆最左端那个「关」按钮是紧急开关：点一下立刻断掉这一路，再点恢复。八路混音后统一进入「推流 + 录制」；参数改动在重新开始输出后生效，输出进行中可点「重启输出」立即应用。"/>
+    <TextBlock DockPanel.Dock="Top" x:Name="DeviceHint" Text="" Foreground="{DynamicResource Brush.Warn}" FontSize="11"
+               Margin="0,6,0,0" TextWrapping="Wrap"/>
+
+    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+      <Button x:Name="RestartBtn" Style="{StaticResource FxBtn}" Content="重启输出"
+              Click="RestartBtn_Click" ToolTip="以新的混音/画效设置重新开始推流与录制"/>
+      <Button x:Name="RefreshBtn" Style="{StaticResource FxBtn}" Content="刷新设备列表"
+              Click="RefreshBtn_Click"/>
+      <Button x:Name="CloseBtn" Style="{StaticResource FxBtn}" Content="关闭" Width="70"
+              Click="CloseBtn_Click"/>
+    </StackPanel>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <StackPanel>
+      <!-- 画面声音：输出框里正在播的每一路输入（2026-10-23 老板要求）
+           多选几个文件一起推上输出后，这里会按「一路输入一行」列出来，
+           可以像硬件通道一样定主次（主音/次音/背景）+ 调音量 + 静音，
+           最终和上面八路采集一起混成一路，进推流与录制。
+           行是运行时按当前输出框动态生成（几路就几行），所以这里是空的 StackPanel。
+
+           ⚠ 2026-10-23 晚**挪到最上面**：老板反馈「全部上输出后没看到多路声音进混音台」。
+              真因是这一块原来排在八路采集通道下面，窗口 700 高装不下，
+              打开混音台满眼都是「未使用」的八路，得往下滚才看得见 —— 等于藏起来了。 -->
+      <Border Style="{StaticResource ChBox}">
+        <StackPanel>
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="画面声音（来自输出框）" FontWeight="SemiBold"
+                       Foreground="{DynamicResource Brush.Text.Primary}" VerticalAlignment="Center"/>
+            <TextBlock x:Name="ProgCount" Text="" Margin="8,0,0,0" Style="{StaticResource Lbl}"/>
+          </StackPanel>
+          <TextBlock x:Name="ProgHint" Text="" Foreground="{DynamicResource Brush.Text.Muted}"
+                     FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"/>
+          <StackPanel x:Name="ProgList" Margin="0,6,0,0"/>
+        </StackPanel>
+      </Border>
+
+      <!-- 采集通道 1–8（麦克风 / 采集卡）：默认折叠，点标题展开。
+           折叠不是"藏功能"：标题上直接写「已启用 N 路」，一眼知道有没有在用；
+           导播时最常调的是上面那块画面声音，八路麦克风设定一次就很少动。 -->
+      <Button x:Name="ChToggle" Click="ChToggle_Click" HorizontalAlignment="Left" Margin="0,10,0,0"
+              Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+        <StackPanel Orientation="Horizontal">
+          <TextBlock x:Name="ChToggleArrow" Text="▸" FontSize="12" VerticalAlignment="Center"
+                     Foreground="{DynamicResource Brush.Text.Secondary}" Margin="0,0,6,0"/>
+          <TextBlock x:Name="ChToggleText" Text="采集通道 1–8（麦克风 / 采集卡）" FontSize="12"
+                     VerticalAlignment="Center" Foreground="{DynamicResource Brush.Text.Secondary}"/>
+          <TextBlock x:Name="ChSummary" Text="" FontSize="11" VerticalAlignment="Center" Margin="8,0,0,0"
+                     Foreground="{DynamicResource Brush.Text.Muted}"/>
+        </StackPanel>
+      </Button>
+
+      <StackPanel x:Name="ChList" Visibility="Collapsed" Margin="0,8,0,0">
+      <!-- 通道 1 -->
+      <Border Style="{StaticResource ChBox}">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="26"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="110"/>
+            <ColumnDefinition Width="40"/>
+            <ColumnDefinition Width="150"/>
+            <ColumnDefinition Width="62"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="58"/>
+          </Grid.ColumnDefinitions>
+          <Border Grid.Column="0" Background="{DynamicResource Brush.Bg.Sunken}">
+            <TextBlock Text="1" Foreground="{DynamicResource Brush.Accent}" FontWeight="Bold" FontSize="13"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <ComboBox Grid.Column="1" x:Name="Dev1" Margin="6,0" Background="{DynamicResource Brush.Bg.Surface}"
+                    SelectionChanged="Dev_SelectionChanged"/>
+          <ComboBox Grid.Column="2" x:Name="Role1" Style="{StaticResource RoleBox}"
+                    SelectionChanged="Role_SelectionChanged" Tag="1"/>
+          <ToggleButton Grid.Column="3" x:Name="Pwr1" Style="{StaticResource PwrBtn}" Tag="1"
+                        Checked="Pwr_Changed" Unchecked="Pwr_Changed"/>
+          <Slider Grid.Column="4" x:Name="Vol1" Minimum="0" Maximum="200" Value="100"
+                  Margin="4,0" ValueChanged="Vol_ValueChanged" Tag="1"/>
+          <TextBlock Grid.Column="5" x:Name="Vol1Text" Text="0.0 dB" Style="{StaticResource Lbl}"/>
+          <CheckBox Grid.Column="6" x:Name="Mut1" Content="静音" Foreground="{DynamicResource Brush.Text.Secondary}"
+                    VerticalAlignment="Center" Checked="Mut_Changed" Unchecked="Mut_Changed" Tag="1"/>
+          <ComboBox Grid.Column="7" x:Name="Cmp1" Height="22" FontSize="10" Margin="6,0,0,0"
+                    Background="{DynamicResource Brush.Bg.Surface}" Tag="1"
+                    SelectionChanged="Cmp_SelectionChanged"
+                    ToolTip="这一路自己的压缩（管忽大忽小）；混完之后还有一道「输出总线压缩」"/>
+        </Grid>
+      </Border>
+
+      <!-- 通道 2 -->
+      <Border Style="{StaticResource ChBox}">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="26"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="110"/>
+            <ColumnDefinition Width="40"/>
+            <ColumnDefinition Width="150"/>
+            <ColumnDefinition Width="62"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="58"/>
+          </Grid.ColumnDefinitions>
+          <Border Grid.Column="0" Background="{DynamicResource Brush.Bg.Sunken}">
+            <TextBlock Text="2" Foreground="{DynamicResource Brush.Ok}" FontWeight="Bold" FontSize="13"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <ComboBox Grid.Column="1" x:Name="Dev2" Margin="6,0" Background="{DynamicResource Brush.Bg.Surface}"
+                    SelectionChanged="Dev_SelectionChanged"/>
+          <ComboBox Grid.Column="2" x:Name="Role2" Style="{StaticResource RoleBox}"
+                    SelectionChanged="Role_SelectionChanged" Tag="2"/>
+          <ToggleButton Grid.Column="3" x:Name="Pwr2" Style="{StaticResource PwrBtn}" Tag="2"
+                        Checked="Pwr_Changed" Unchecked="Pwr_Changed"/>
+          <Slider Grid.Column="4" x:Name="Vol2" Minimum="0" Maximum="200" Value="100"
+                  Margin="4,0" ValueChanged="Vol_ValueChanged" Tag="2"/>
+          <TextBlock Grid.Column="5" x:Name="Vol2Text" Text="0.0 dB" Style="{StaticResource Lbl}"/>
+          <CheckBox Grid.Column="6" x:Name="Mut2" Content="静音" Foreground="{DynamicResource Brush.Text.Secondary}"
+                    VerticalAlignment="Center" Checked="Mut_Changed" Unchecked="Mut_Changed" Tag="2"/>
+          <ComboBox Grid.Column="7" x:Name="Cmp2" Height="22" FontSize="10" Margin="6,0,0,0"
+                    Background="{DynamicResource Brush.Bg.Surface}" Tag="2"
+                    SelectionChanged="Cmp_SelectionChanged"
+                    ToolTip="这一路自己的压缩（管忽大忽小）；混完之后还有一道「输出总线压缩」"/>
+        </Grid>
+      </Border>
+
+      <!-- 通道 3 -->
+      <Border Style="{StaticResource ChBox}">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="26"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="110"/>
+            <ColumnDefinition Width="40"/>
+            <ColumnDefinition Width="150"/>
+            <ColumnDefinition Width="62"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="58"/>
+          </Grid.ColumnDefinitions>
+          <Border Grid.Column="0" Background="{DynamicResource Brush.Bg.Sunken}">
+            <TextBlock Text="3" Foreground="{DynamicResource Brush.Gold}" FontWeight="Bold" FontSize="13"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <ComboBox Grid.Column="1" x:Name="Dev3" Margin="6,0" Background="{DynamicResource Brush.Bg.Surface}"
+                    SelectionChanged="Dev_SelectionChanged"/>
+          <ComboBox Grid.Column="2" x:Name="Role3" Style="{StaticResource RoleBox}"
+                    SelectionChanged="Role_SelectionChanged" Tag="3"/>
+          <ToggleButton Grid.Column="3" x:Name="Pwr3" Style="{StaticResource PwrBtn}" Tag="3"
+                        Checked="Pwr_Changed" Unchecked="Pwr_Changed"/>
+          <Slider Grid.Column="4" x:Name="Vol3" Minimum="0" Maximum="200" Value="100"
+                  Margin="4,0" ValueChanged="Vol_ValueChanged" Tag="3"/>
+          <TextBlock Grid.Column="5" x:Name="Vol3Text" Text="0.0 dB" Style="{StaticResource Lbl}"/>
+          <CheckBox Grid.Column="6" x:Name="Mut3" Content="静音" Foreground="{DynamicResource Brush.Text.Secondary}"
+                    VerticalAlignment="Center" Checked="Mut_Changed" Unchecked="Mut_Changed" Tag="3"/>
+          <ComboBox Grid.Column="7" x:Name="Cmp3" Height="22" FontSize="10" Margin="6,0,0,0"
+                    Background="{DynamicResource Brush.Bg.Surface}" Tag="3"
+                    SelectionChanged="Cmp_SelectionChanged"
+                    ToolTip="这一路自己的压缩（管忽大忽小）；混完之后还有一道「输出总线压缩」"/>
+        </Grid>
+      </Border>
+
+      <!-- 通道 4 -->
+      <Border Style="{StaticResource ChBox}">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="26"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="110"/>
+            <ColumnDefinition Width="40"/>
+            <ColumnDefinition Width="150"/>
+            <ColumnDefinition Width="62"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="58"/>
+          </Grid.ColumnDefinitions>
+          <Border Grid.Column="0" Background="{DynamicResource Brush.Bg.Sunken}">
+            <TextBlock Text="4" Foreground="{DynamicResource Brush.Pvw}" FontWeight="Bold" FontSize="13"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <ComboBox Grid.Column="1" x:Name="Dev4" Margin="6,0" Background="{DynamicResource Brush.Bg.Surface}"
+                    SelectionChanged="Dev_SelectionChanged"/>
+          <ComboBox Grid.Column="2" x:Name="Role4" Style="{StaticResource RoleBox}"
+                    SelectionChanged="Role_SelectionChanged" Tag="4"/>
+          <ToggleButton Grid.Column="3" x:Name="Pwr4" Style="{StaticResource PwrBtn}" Tag="4"
+                        Checked="Pwr_Changed" Unchecked="Pwr_Changed"/>
+          <Slider Grid.Column="4" x:Name="Vol4" Minimum="0" Maximum="200" Value="100"
+                  Margin="4,0" ValueChanged="Vol_ValueChanged" Tag="4"/>
+          <TextBlock Grid.Column="5" x:Name="Vol4Text" Text="0.0 dB" Style="{StaticResource Lbl}"/>
+          <CheckBox Grid.Column="6" x:Name="Mut4" Content="静音" Foreground="{DynamicResource Brush.Text.Secondary}"
+                    VerticalAlignment="Center" Checked="Mut_Changed" Unchecked="Mut_Changed" Tag="4"/>
+          <ComboBox Grid.Column="7" x:Name="Cmp4" Height="22" FontSize="10" Margin="6,0,0,0"
+                    Background="{DynamicResource Brush.Bg.Surface}" Tag="4"
+                    SelectionChanged="Cmp_SelectionChanged"
+                    ToolTip="这一路自己的压缩（管忽大忽小）；混完之后还有一道「输出总线压缩」"/>
+        </Grid>
+      </Border>
+
+      <!-- 通道 5 -->
+      <Border Style="{StaticResource ChBox}">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="26"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="110"/>
+            <ColumnDefinition Width="40"/>
+            <ColumnDefinition Width="150"/>
+            <ColumnDefinition Width="62"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="58"/>
+          </Grid.ColumnDefinitions>
+          <Border Grid.Column="0" Background="{DynamicResource Brush.Bg.Sunken}">
+            <TextBlock Text="5" Foreground="{DynamicResource Brush.Accent}" FontWeight="Bold" FontSize="13"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <ComboBox Grid.Column="1" x:Name="Dev5" Margin="6,0" Background="{DynamicResource Brush.Bg.Surface}"
+                    SelectionChanged="Dev_SelectionChanged"/>
+          <ComboBox Grid.Column="2" x:Name="Role5" Style="{StaticResource RoleBox}"
+                    SelectionChanged="Role_SelectionChanged" Tag="5"/>
+          <ToggleButton Grid.Column="3" x:Name="Pwr5" Style="{StaticResource PwrBtn}" Tag="5"
+                        Checked="Pwr_Changed" Unchecked="Pwr_Changed"/>
+          <Slider Grid.Column="4" x:Name="Vol5" Minimum="0" Maximum="200" Value="100"
+                  Margin="4,0" ValueChanged="Vol_ValueChanged" Tag="5"/>
+          <TextBlock Grid.Column="5" x:Name="Vol5Text" Text="0.0 dB" Style="{StaticResource Lbl}"/>
+          <CheckBox Grid.Column="6" x:Name="Mut5" Content="静音" Foreground="{DynamicResource Brush.Text.Secondary}"
+                    VerticalAlignment="Center" Checked="Mut_Changed" Unchecked="Mut_Changed" Tag="5"/>
+          <ComboBox Grid.Column="7" x:Name="Cmp5" Height="22" FontSize="10" Margin="6,0,0,0"
+                    Background="{DynamicResource Brush.Bg.Surface}" Tag="5"
+                    SelectionChanged="Cmp_SelectionChanged"
+                    ToolTip="这一路自己的压缩（管忽大忽小）；混完之后还有一道「输出总线压缩」"/>
+        </Grid>
+      </Border>
+
+      <!-- 通道 6 -->
+      <Border Style="{StaticResource ChBox}">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="26"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="110"/>
+            <ColumnDefinition Width="40"/>
+            <ColumnDefinition Width="150"/>
+            <ColumnDefinition Width="62"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="58"/>
+          </Grid.ColumnDefinitions>
+          <Border Grid.Column="0" Background="{DynamicResource Brush.Bg.Sunken}">
+            <TextBlock Text="6" Foreground="{DynamicResource Brush.Ok}" FontWeight="Bold" FontSize="13"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <ComboBox Grid.Column="1" x:Name="Dev6" Margin="6,0" Background="{DynamicResource Brush.Bg.Surface}"
+                    SelectionChanged="Dev_SelectionChanged"/>
+          <ComboBox Grid.Column="2" x:Name="Role6" Style="{StaticResource RoleBox}"
+                    SelectionChanged="Role_SelectionChanged" Tag="6"/>
+          <ToggleButton Grid.Column="3" x:Name="Pwr6" Style="{StaticResource PwrBtn}" Tag="6"
+                        Checked="Pwr_Changed" Unchecked="Pwr_Changed"/>
+          <Slider Grid.Column="4" x:Name="Vol6" Minimum="0" Maximum="200" Value="100"
+                  Margin="4,0" ValueChanged="Vol_ValueChanged" Tag="6"/>
+          <TextBlock Grid.Column="5" x:Name="Vol6Text" Text="0.0 dB" Style="{StaticResource Lbl}"/>
+          <CheckBox Grid.Column="6" x:Name="Mut6" Content="静音" Foreground="{DynamicResource Brush.Text.Secondary}"
+                    VerticalAlignment="Center" Checked="Mut_Changed" Unchecked="Mut_Changed" Tag="6"/>
+          <ComboBox Grid.Column="7" x:Name="Cmp6" Height="22" FontSize="10" Margin="6,0,0,0"
+                    Background="{DynamicResource Brush.Bg.Surface}" Tag="6"
+                    SelectionChanged="Cmp_SelectionChanged"
+                    ToolTip="这一路自己的压缩（管忽大忽小）；混完之后还有一道「输出总线压缩」"/>
+        </Grid>
+      </Border>
+
+      <!-- 通道 7 -->
+      <Border Style="{StaticResource ChBox}">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="26"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="110"/>
+            <ColumnDefinition Width="40"/>
+            <ColumnDefinition Width="150"/>
+            <ColumnDefinition Width="62"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="58"/>
+          </Grid.ColumnDefinitions>
+          <Border Grid.Column="0" Background="{DynamicResource Brush.Bg.Sunken}">
+            <TextBlock Text="7" Foreground="{DynamicResource Brush.Gold}" FontWeight="Bold" FontSize="13"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <ComboBox Grid.Column="1" x:Name="Dev7" Margin="6,0" Background="{DynamicResource Brush.Bg.Surface}"
+                    SelectionChanged="Dev_SelectionChanged"/>
+          <ComboBox Grid.Column="2" x:Name="Role7" Style="{StaticResource RoleBox}"
+                    SelectionChanged="Role_SelectionChanged" Tag="7"/>
+          <ToggleButton Grid.Column="3" x:Name="Pwr7" Style="{StaticResource PwrBtn}" Tag="7"
+                        Checked="Pwr_Changed" Unchecked="Pwr_Changed"/>
+          <Slider Grid.Column="4" x:Name="Vol7" Minimum="0" Maximum="200" Value="100"
+                  Margin="4,0" ValueChanged="Vol_ValueChanged" Tag="7"/>
+          <TextBlock Grid.Column="5" x:Name="Vol7Text" Text="0.0 dB" Style="{StaticResource Lbl}"/>
+          <CheckBox Grid.Column="6" x:Name="Mut7" Content="静音" Foreground="{DynamicResource Brush.Text.Secondary}"
+                    VerticalAlignment="Center" Checked="Mut_Changed" Unchecked="Mut_Changed" Tag="7"/>
+          <ComboBox Grid.Column="7" x:Name="Cmp7" Height="22" FontSize="10" Margin="6,0,0,0"
+                    Background="{DynamicResource Brush.Bg.Surface}" Tag="7"
+                    SelectionChanged="Cmp_SelectionChanged"
+                    ToolTip="这一路自己的压缩（管忽大忽小）；混完之后还有一道「输出总线压缩」"/>
+        </Grid>
+      </Border>
+
+      <!-- 通道 8 -->
+      <Border Style="{StaticResource ChBox}">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="26"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="110"/>
+            <ColumnDefinition Width="40"/>
+            <ColumnDefinition Width="150"/>
+            <ColumnDefinition Width="62"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="58"/>
+          </Grid.ColumnDefinitions>
+          <Border Grid.Column="0" Background="{DynamicResource Brush.Bg.Sunken}">
+            <TextBlock Text="8" Foreground="{DynamicResource Brush.Pvw}" FontWeight="Bold" FontSize="13"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <ComboBox Grid.Column="1" x:Name="Dev8" Margin="6,0" Background="{DynamicResource Brush.Bg.Surface}"
+                    SelectionChanged="Dev_SelectionChanged"/>
+          <ComboBox Grid.Column="2" x:Name="Role8" Style="{StaticResource RoleBox}"
+                    SelectionChanged="Role_SelectionChanged" Tag="8"/>
+          <ToggleButton Grid.Column="3" x:Name="Pwr8" Style="{StaticResource PwrBtn}" Tag="8"
+                        Checked="Pwr_Changed" Unchecked="Pwr_Changed"/>
+          <Slider Grid.Column="4" x:Name="Vol8" Minimum="0" Maximum="200" Value="100"
+                  Margin="4,0" ValueChanged="Vol_ValueChanged" Tag="8"/>
+          <TextBlock Grid.Column="5" x:Name="Vol8Text" Text="0.0 dB" Style="{StaticResource Lbl}"/>
+          <CheckBox Grid.Column="6" x:Name="Mut8" Content="静音" Foreground="{DynamicResource Brush.Text.Secondary}"
+                    VerticalAlignment="Center" Checked="Mut_Changed" Unchecked="Mut_Changed" Tag="8"/>
+          <ComboBox Grid.Column="7" x:Name="Cmp8" Height="22" FontSize="10" Margin="6,0,0,0"
+                    Background="{DynamicResource Brush.Bg.Surface}" Tag="8"
+                    SelectionChanged="Cmp_SelectionChanged"
+                    ToolTip="这一路自己的压缩（管忽大忽小）；混完之后还有一道「输出总线压缩」"/>
+        </Grid>
+      </Border>
+      </StackPanel><!-- /ChList 采集通道 1–8 -->
+
+      <!-- 输出总线：混音之后的最后一道闸（2026-10-23）
+           八路各自调完音量再混，很容易超过 0 dB —— 一超过就是削顶破音，听众那边"噼"一下。
+           压缩器把峰值压下去，最后再串一级 -1 dB 限幅兜底。 -->
+      <Border Style="{StaticResource ChBox}" Margin="0,10,0,0">
+        <StackPanel>
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="输出总线压缩" FontWeight="SemiBold" VerticalAlignment="Center"
+                       Foreground="{DynamicResource Brush.Text.Primary}"/>
+            <ComboBox x:Name="CompLevel" Width="96" Margin="10,0,0,0"
+                      SelectionChanged="CompLevel_SelectionChanged"/>
+            <TextBlock x:Name="CompDbText" Text="" Margin="10,0,0,0" VerticalAlignment="Center"
+                       Style="{StaticResource Lbl}"/>
+          </StackPanel>
+
+          <Grid Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="阈值" Style="{StaticResource Lbl}" Margin="0,0,6,0"/>
+            <Slider Grid.Column="1" x:Name="CompThreshold" Minimum="-40" Maximum="-3" Value="-18"
+                    Margin="0,0,12,0" ValueChanged="Comp_ValueChanged"/>
+            <TextBlock Grid.Column="2" Text="压缩比" Style="{StaticResource Lbl}" Margin="0,0,6,0"/>
+            <Slider Grid.Column="3" x:Name="CompRatio" Minimum="1" Maximum="20" Value="3"
+                    Margin="0,0,12,0" ValueChanged="Comp_ValueChanged"/>
+            <TextBlock Grid.Column="4" Text="增益补偿" Style="{StaticResource Lbl}" Margin="0,0,6,0"/>
+            <Slider Grid.Column="5" x:Name="CompMakeup" Minimum="0" Maximum="12" Value="2"
+                    ValueChanged="Comp_ValueChanged"/>
+          </Grid>
+
+          <TextBlock x:Name="CompHint" Text="" Foreground="{DynamicResource Brush.Text.Muted}"
+                     FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"/>
+        </StackPanel>
+      </Border>
+
+      <TextBlock x:Name="TracksHint" Text="" Foreground="{DynamicResource Brush.Text.Muted}" FontSize="11" TextWrapping="Wrap"
+                 Margin="0,2,0,0"/>
+    </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</Window>

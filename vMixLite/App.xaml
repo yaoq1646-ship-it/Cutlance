@@ -1,0 +1,17 @@
+<Application x:Class="Cutlance.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Cutlance">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <!--
+          主题层（现代科技深色）：调色板 + 度量 token + 矢量图标 + 全套深色控件模板。
+          ⚠ 全部控件样式都集中在这里，各窗口只引用、不再各自硬编码色值（改造前
+            12 个窗口共约 570 处硬编码色值、73 个不同色号）。
+        -->
+        <ResourceDictionary Source="Themes/Theme.xaml"/>
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+</Application>

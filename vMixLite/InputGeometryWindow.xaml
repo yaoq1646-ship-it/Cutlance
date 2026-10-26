@@ -1,0 +1,125 @@
+﻿<Window x:Class="Cutlance.InputGeometryWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="输入裁切 / 旋转" Height="560" Width="486"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Style="{StaticResource AppWindow}">
+  <Window.Resources>
+    <Style x:Key="Lbl" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}"/>
+      <Setter Property="Margin" Value="0,10,0,4"/>
+    </Style>
+    <Style x:Key="Hint" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Muted}"/>
+      <Setter Property="FontSize" Value="11"/>
+      <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+    <Style x:Key="CtlBtn" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+      <Setter Property="Background" Value="{DynamicResource Brush.Bg.Raised}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text}"/>
+      <Setter Property="Height" Value="32"/>
+      <Setter Property="FontSize" Value="13"/>
+      <Setter Property="Padding" Value="14,0"/>
+      <Setter Property="Margin" Value="0,0,8,0"/>
+    </Style>
+    <Style x:Key="Txt" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+      <Setter Property="Background" Value="{DynamicResource Brush.Bg.Surface}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+      <Setter Property="Height" Value="26"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="Padding" Value="6,0"/>
+      <Setter Property="FontFamily" Value="Consolas"/>
+      <Setter Property="FontSize" Value="13"/>
+    </Style>
+  </Window.Resources>
+
+  <StackPanel Margin="16">
+    <!-- 当前作用的输入 -->
+    <Border Background="{DynamicResource Brush.Bg.Sunken}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
+            CornerRadius="4" Padding="10,8">
+      <StackPanel>
+        <TextBlock x:Name="TitleLine" Text="输入" Foreground="{DynamicResource Brush.Pvw}"
+                   FontSize="14" FontWeight="Bold"/>
+        <TextBlock x:Name="SrcInfo" Text="源分辨率：检测中…" Style="{StaticResource Hint}"
+                   Margin="0,4,0,0"/>
+      </StackPanel>
+    </Border>
+
+    <!-- 裁切 -->
+    <TextBlock Text="裁切（像素，按源画面尺寸）" Style="{StaticResource Lbl}"/>
+    <Grid>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="8"/>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="8"/>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="8"/>
+        <ColumnDefinition Width="*"/>
+      </Grid.ColumnDefinitions>
+      <StackPanel Grid.Column="0">
+        <TextBlock Text="上" Foreground="{DynamicResource Brush.Text.Muted}" FontSize="11" Margin="2,0,0,3"/>
+        <TextBox x:Name="TxtTop" Text="0" Style="{StaticResource Txt}" TextChanged="Field_Changed"/>
+      </StackPanel>
+      <StackPanel Grid.Column="2">
+        <TextBlock Text="下" Foreground="{DynamicResource Brush.Text.Muted}" FontSize="11" Margin="2,0,0,3"/>
+        <TextBox x:Name="TxtBottom" Text="0" Style="{StaticResource Txt}" TextChanged="Field_Changed"/>
+      </StackPanel>
+      <StackPanel Grid.Column="4">
+        <TextBlock Text="左" Foreground="{DynamicResource Brush.Text.Muted}" FontSize="11" Margin="2,0,0,3"/>
+        <TextBox x:Name="TxtLeft" Text="0" Style="{StaticResource Txt}" TextChanged="Field_Changed"/>
+      </StackPanel>
+      <StackPanel Grid.Column="6">
+        <TextBlock Text="右" Foreground="{DynamicResource Brush.Text.Muted}" FontSize="11" Margin="2,0,0,3"/>
+        <TextBox x:Name="TxtRight" Text="0" Style="{StaticResource Txt}" TextChanged="Field_Changed"/>
+      </StackPanel>
+    </Grid>
+
+    <!-- 旋转 / 镜像 -->
+    <TextBlock Text="旋转 / 镜像" Style="{StaticResource Lbl}"/>
+    <StackPanel Orientation="Horizontal">
+      <ComboBox x:Name="RotateCombo" Width="120" Height="26" SelectedIndex="0"
+                SelectionChanged="Field_Changed">
+        <ComboBoxItem Content="不旋转" Tag="0"/>
+        <ComboBoxItem Content="顺时针 90°" Tag="90"/>
+        <ComboBoxItem Content="旋转 180°" Tag="180"/>
+        <ComboBoxItem Content="顺时针 270°" Tag="270"/>
+      </ComboBox>
+      <CheckBox x:Name="ChkFlipH" Content="水平镜像" Foreground="{DynamicResource Brush.Text}"
+                VerticalAlignment="Center" Margin="16,0,0,0" Click="Field_Changed"/>
+      <CheckBox x:Name="ChkFlipV" Content="垂直镜像" Foreground="{DynamicResource Brush.Text}"
+                VerticalAlignment="Center" Margin="14,0,0,0" Click="Field_Changed"/>
+    </StackPanel>
+
+    <!-- 操作 -->
+    <StackPanel Orientation="Horizontal" Margin="0,18,0,0">
+      <Button Style="{StaticResource CtlBtn}" Click="BtnReset_Click">
+        <StackPanel Orientation="Horizontal"><Path Style="{StaticResource IconLine}" Data="{StaticResource Icon.Reset}" Width="13" Height="13" VerticalAlignment="Center"/><TextBlock Text="全部清零" Margin="5,0,0,0" VerticalAlignment="Center"/></StackPanel>
+      </Button>
+      <Button Content="关闭" Style="{StaticResource CtlBtn}" Click="BtnClose_Click"/>
+    </StackPanel>
+
+    <TextBlock x:Name="StatusLine" Text="改动即时生效" Style="{StaticResource Hint}"
+               Margin="0,12,0,0"/>
+
+    <Border Background="{DynamicResource Brush.Bg.Overlay}" BorderBrush="{DynamicResource Brush.Bg.Surface}" BorderThickness="1"
+            CornerRadius="4" Padding="10,8" Margin="0,12,0,0">
+      <StackPanel>
+        <TextBlock Text="说明" Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="12" FontWeight="Bold"/>
+        <TextBlock Style="{StaticResource Hint}" Margin="0,5,0,0"
+                   Text="· 裁切与旋转作用于「这一路输入」本身：预览框、输出图层、播放列表里凡是播这个输入的画面，都带同样的处理。"/>
+        <TextBlock Style="{StaticResource Hint}" Margin="0,3,0,0"
+                   Text="· 裁切按源画面像素计算；四边裁切之和不能超过源画面尺寸（超了会看不见画面，恢复时点「全部清零」）。"/>
+        <TextBlock Style="{StaticResource Hint}" Margin="0,3,0,0"
+                   Text="· 处理链路：另起一个 ffmpeg 把画面裁好/转好，再喂给 VLC 播放 —— 所以预览、输出、推流看到的都是处理后的画面。"/>
+        <TextBlock Style="{StaticResource Hint}" Margin="0,3,0,0"
+                   Text="· 代价：这一路会比别的输入晚约 0.5 秒（编码+传输），不宜与未处理的机位硬切同步。"/>
+        <TextBlock Style="{StaticResource Hint}" Margin="0,3,0,0"
+                   Text="· 文件类输入经处理后变成直播流，不能再拖动进度条。"/>
+        <TextBlock Style="{StaticResource Hint}" Margin="0,3,0,0"
+                   Text="· 全部清零后该输入会回到直接播放，不占额外进程与延迟。"/>
+      </StackPanel>
+    </Border>
+  </StackPanel>
+</Window>

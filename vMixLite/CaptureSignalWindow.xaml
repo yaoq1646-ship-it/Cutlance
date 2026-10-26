@@ -1,0 +1,372 @@
+﻿<Window x:Class="Cutlance.CaptureSignalWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="输入信号 — 采集设备与格式" Height="940" Width="1000" WindowStartupLocation="CenterOwner" ResizeMode="CanResize"
+        TextOptions.TextFormattingMode="Display"
+        Style="{StaticResource AppWindow}">
+  <Window.Resources>
+    <Style x:Key="Lbl" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}"/>
+      <Setter Property="Margin" Value="0,0,0,4"/>
+    </Style>
+    <Style x:Key="Hint" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Muted}"/>
+      <Setter Property="FontSize" Value="10"/>
+      <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+    <!-- 格式表：可选中，选中行高亮（用于「添加为输入」） -->
+    <!-- 下拉项：浅色是 WPF 默认模板的系统色，必须自绘，否则深色界面上是刺眼的白底黑字 -->
+    <!-- 下拉框本体：WPF 默认模板用固定系统色，Background 设了也不生效 → 整段自绘 -->
+    <!-- 输入框：深色主题下 WPF 默认模板的边框/背景偏亮，统一自绘（与网络流面板一致） -->
+    <!--
+      色块 / 小按钮（键色、背景色、浏览…）专用样式。
+      ⚠ 为什么要自绘：WPF 默认 Button 模板在**禁用态**会退回系统浅色外观，
+        把自定义 Background 直接盖掉 —— 结果「抠像未启用」时那几个彩色按钮
+        变成一片白，白字在白底上几乎读不出来（实测截图确认）。
+        这里禁用态改成「半透明」而不是「变白」：既能看出是灰的（不可用），
+        又还认得出它是绿幕按钮还是蓝幕按钮。
+    -->
+    <Style x:Key="SwatchBtn" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text}"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border Background="{TemplateBinding Background}" CornerRadius="2"
+                    SnapsToDevicePixels="True">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Opacity" Value="0.82"/>
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Opacity" Value="0.62"/>
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.35"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- 滑条：WPF 默认模板在深色下是浅色轨道 + 系统色滑块，自绘保持一致的观感 -->
+  </Window.Resources>
+
+  <!-- 内容整体可滚：小逻辑屏（如 1080p@150%，可用高仅 ~670 DIP）下窗口高度会被
+       WindowFit 收敛到屏幕可用区，这里保证收敛后整块内容（含底部按钮）仍能滚到，不被裁掉。 -->
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+  <Grid Margin="14">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <!-- 原来是 *（吃剩余空间）。套进 ScrollViewer 后星号行等价于 Auto，改显式高度更可预期：
+           设备表 / 格式表各 230 高（约 6~7 行）够用，也不会把整窗撑到屏幕外。 -->
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <!-- 标题 + 说明 -->
+    <StackPanel Grid.Row="0" Margin="0,0,0,10">
+      <TextBlock Text="① 输入信号格式" Foreground="{DynamicResource Brush.Warn}" FontSize="15" FontWeight="Bold"/>
+      <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,0"
+                 Text="左侧选设备 → 下方先看「当前输入信号」（实测这根线正送进来什么），再看它支持的格式清单。定完音频与链路，选中一行后点「添加为输入」。"/>
+    </StackPanel>
+
+    <!-- 左：设备列表     右：信号格式 -->
+    <Grid Grid.Row="1">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="300"/>
+        <ColumnDefinition Width="10"/>
+        <ColumnDefinition Width="*"/>
+      </Grid.ColumnDefinitions>
+
+      <DockPanel Grid.Column="0">
+        <TextBlock DockPanel.Dock="Top" Text="采集设备" Style="{StaticResource Lbl}"/>
+        <Border Height="230" BorderBrush="{DynamicResource Brush.Bg.Surface}" BorderThickness="1" Background="{DynamicResource Brush.Bg.Overlay}">
+          <!-- 多卡管理：Extended 多选，可一次把多路采集卡全部加为输入（Ctrl/Shift 多选） -->
+          <ListBox x:Name="DeviceList" Background="Transparent" BorderThickness="0"
+                   Foreground="{DynamicResource Brush.Text}" SelectionMode="Extended"
+                   SelectionChanged="DeviceList_SelectionChanged"
+                   ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <StackPanel>
+                  <TextBlock Text="{Binding Name}" TextWrapping="Wrap" Foreground="{DynamicResource Brush.Text}"/>
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding KindText}" FontSize="10" Foreground="{DynamicResource Brush.Warn}"/>
+                    <StackPanel Orientation="Horizontal" Margin="8,0,0,0" Visibility="{Binding UsedVisibility}">
+                      <Path Style="{StaticResource IconLine}" Data="{StaticResource Icon.Check}"
+                            Stroke="{DynamicResource Brush.Ok}" Width="9" Height="9" VerticalAlignment="Center"/>
+                      <TextBlock Text="已在输入列表中" FontSize="10" Foreground="{DynamicResource Brush.Ok}"
+                                 Margin="3,0,0,0"/>
+                    </StackPanel>
+                  </StackPanel>
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Border>
+      </DockPanel>
+
+      <DockPanel Grid.Column="2">
+        <TextBlock DockPanel.Dock="Top" Text="该设备支持的信号格式（决定强制哪一档；不强制就选「自动」）"
+                   Style="{StaticResource Lbl}"/>
+        <Border Height="230" BorderBrush="{DynamicResource Brush.Bg.Surface}" BorderThickness="1" Background="{DynamicResource Brush.Bg.Overlay}">
+          <Grid>
+            <!-- 空态 / 加载 / 错误提示 -->
+            <TextBlock x:Name="FormatHint" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Foreground="{DynamicResource Brush.Text.Muted}" TextWrapping="Wrap" TextAlignment="Center"
+                       Margin="20" Visibility="Collapsed"/>
+            <ListView x:Name="FormatList" Background="Transparent" BorderThickness="0"
+                      Foreground="{DynamicResource Brush.Text}" Visibility="Collapsed"
+                      SelectionChanged="FormatList_SelectionChanged"
+                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+              <ListView.View>
+                <GridView>
+                  <GridViewColumn Header="分辨率" Width="200"
+                                  DisplayMemberBinding="{Binding ResolutionText}"/>
+                  <GridViewColumn Header="像素格式" Width="110"
+                                  DisplayMemberBinding="{Binding PixelText}"/>
+                  <GridViewColumn Header="帧率 (fps)" Width="130"
+                                  DisplayMemberBinding="{Binding FpsText}"/>
+                </GridView>
+              </ListView.View>
+            </ListView>
+          </Grid>
+        </Border>
+      </DockPanel>
+    </Grid>
+
+    <!-- 当前输入信号：实测这根线正送进来什么（与上面的「能力清单」是两码事） -->
+    <Border Grid.Row="2" BorderBrush="{DynamicResource Brush.Info.Border}" BorderThickness="1" Background="{DynamicResource Brush.Info.Bg}"
+            Margin="0,10,0,0" Padding="10,7">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto"/>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <TextBlock Grid.Column="0" Text="当前输入信号" Foreground="{DynamicResource Brush.Pvw}"
+                   FontWeight="Bold" FontSize="12" VerticalAlignment="Center" Margin="0,0,10,0"/>
+        <!-- 信号状态灯：与文字同一套状态（绿=有信号 / 橙=异常或过长 / 灰=检测中） -->
+        <Ellipse x:Name="SignalDot" Grid.Column="1" Width="9" Height="9" Fill="{DynamicResource Brush.Text.Secondary}"
+                 VerticalAlignment="Center" HorizontalAlignment="Left" Margin="0,0,0,0"/>
+        <TextBlock Grid.Column="1" x:Name="SignalText" Foreground="{DynamicResource Brush.Text}" FontSize="12"
+                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="16,0,0,0"
+                   Text="（选中设备后自动检测）"/>
+        <Button Grid.Column="2" x:Name="BtnProbe" Content="重新检测" Width="78" Height="24"
+                Background="{DynamicResource Brush.Info.Border}" Foreground="{DynamicResource Brush.Info.Text}" BorderThickness="0"
+                Click="Probe_Click"/>
+      </Grid>
+    </Border>
+
+    <!-- ② 采集设置：音频设备 + 采集链路 + 去隔行 + 延迟档 -->
+    <Border Grid.Row="3" BorderBrush="{DynamicResource Brush.Bg.Surface}" BorderThickness="1" Background="{DynamicResource Brush.Bg.Sunken}"
+            Margin="0,10,0,0" Padding="10,8">
+      <StackPanel>
+        <TextBlock Text="② 采集设置" Foreground="{DynamicResource Brush.Warn}" FontWeight="Bold" FontSize="13" Margin="0,0,0,8"/>
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="22"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="250"/>
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0" Text="音频设备" Foreground="{DynamicResource Brush.Text.Secondary}"
+                     VerticalAlignment="Center" Margin="0,0,8,0"/>
+          <ComboBox Grid.Column="1" x:Name="AudioCombo"
+                    SelectionChanged="AudioCombo_SelectionChanged"
+                    ToolTip="采集卡的内嵌 HDMI 音频会作为独立设备出现，选中视频设备时会自动匹配同名的那一路"/>
+          <TextBlock Grid.Column="3" Text="采集链路" Foreground="{DynamicResource Brush.Text.Secondary}"
+                     VerticalAlignment="Center" Margin="0,0,8,0"/>
+          <ComboBox Grid.Column="4" x:Name="LinkCombo"
+                    SelectionChanged="LinkCombo_SelectionChanged"/>
+        </Grid>
+        <TextBlock x:Name="SettingHint" Style="{StaticResource Hint}" Margin="0,7,0,0"
+                   Text="选中左侧视频设备后，这里会自动匹配它的配套音频。「采集链路」决定用哪条管道取画面（可各加一路对比实测）。"/>
+
+        <!-- 模块E B-2：去隔行 + 延迟档 -->
+        <Grid Margin="0,8,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="22"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="250"/>
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0" Text="去隔行" Foreground="{DynamicResource Brush.Text.Secondary}"
+                     VerticalAlignment="Center" Margin="0,0,8,0"/>
+          <ComboBox Grid.Column="1" x:Name="DeintCombo"
+                    SelectionChanged="DeintCombo_SelectionChanged"
+                    ToolTip="1080i 等隔行信号逐行播出会拉丝。默认「自动」：面板实测到隔行才启用（yadif），逐行信号不动它"/>
+          <TextBlock Grid.Column="3" Text="延迟档" Foreground="{DynamicResource Brush.Text.Secondary}"
+                     VerticalAlignment="Center" Margin="0,0,8,0"/>
+          <ComboBox Grid.Column="4" x:Name="LatencyCombo"
+                    SelectionChanged="LatencyCombo_SelectionChanged"
+                    ToolTip="低延迟档：播放缓冲 120→60ms、关时钟抖动补偿、关键帧间隔 1s→0.25s，约再省 250~350ms；抖动环境下更易丢帧"/>
+        </Grid>
+        <TextBlock x:Name="DeintHint" Style="{StaticResource Hint}" Margin="0,7,0,0"
+                   Text="去隔行只在该路信号确实隔行时才启用 —— 对逐行信号做去隔行反而会糊掉垂直细节，所以默认交给程序自动判断。"/>
+
+        <!-- 多卡管理：USB 带宽估算。四路卡全开 1080p60 无压缩会超过 USB3 上限，这里先算给用户看 -->
+        <TextBlock x:Name="BandwidthText" Style="{StaticResource Hint}" Margin="0,4,0,0"
+                   Foreground="{DynamicResource Brush.Text.Secondary}" Visibility="Collapsed"/>
+      </StackPanel>
+    </Border>
+
+    <!-- ③ 抠像换背景（模块C A-2）：绿幕/蓝幕换背景 -->
+    <Border Grid.Row="4" BorderBrush="{DynamicResource Brush.Bg.Surface}" BorderThickness="1" Background="{DynamicResource Brush.Bg.Sunken}"
+            Margin="0,10,0,0" Padding="10,8">
+      <StackPanel>
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+          <TextBlock Text="③ 抠像换背景" Foreground="{DynamicResource Brush.Warn}" FontWeight="Bold" FontSize="13"/>
+          <TextBlock Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="10,2,0,0"
+                     Text="把画面里的绿幕/蓝幕抠掉，换成另一张背景（纯色 / 图片 / 视频）"/>
+        </StackPanel>
+
+        <CheckBox x:Name="ChkChroma" Content="启用抠像（绿幕换背景）" Margin="0,0,0,8"
+                  Checked="Chroma_Toggled" Unchecked="Chroma_Toggled"/>
+
+        <StackPanel x:Name="ChromaPanel" IsEnabled="False">
+          <!-- 键色 + 背景类型 -->
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="20"/>
+              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="220"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="键色（要抠掉的颜色）" Foreground="{DynamicResource Brush.Text.Secondary}"
+                       VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+              <StackPanel.Resources>
+                <Style TargetType="Button" BasedOn="{StaticResource SwatchBtn}"/>
+              </StackPanel.Resources>
+              <Button Content="绿幕" Width="56" Height="26" Margin="0,0,4,0" Tag="0x00B140"
+                      Background="#0B7A2E" Foreground="{DynamicResource Brush.Text}" BorderThickness="0"
+                      ToolTip="标准数字绿幕色（比纯绿 0x00FF00 更贴近实际绿布）"
+                      Click="KeySwatch_Click"/>
+              <Button Content="蓝幕" Width="56" Height="26" Margin="0,0,4,0" Tag="0x0000FF"
+                      Background="#1B3FBF" Foreground="{DynamicResource Brush.Text}" BorderThickness="0"
+                      Click="KeySwatch_Click"/>
+              <Button Content="品红" Width="56" Height="26" Margin="0,0,8,0" Tag="0xFF00FF"
+                      Background="#9C27B0" Foreground="{DynamicResource Brush.Text}" BorderThickness="0"
+                      ToolTip="有些虚拟演播棚用品红幕"
+                      Click="KeySwatch_Click"/>
+              <TextBox x:Name="KeyColorHex" Width="100" Text="0x00B140"
+                       ToolTip="也可直接手输 0xRRGGBB 或 #RRGGBB"/>
+            </StackPanel>
+            <TextBlock Grid.Column="3" Text="背景类型" Foreground="{DynamicResource Brush.Text.Secondary}"
+                       VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <ComboBox Grid.Column="4" x:Name="BgTypeCombo"
+                      SelectionChanged="BgType_SelectionChanged"/>
+          </Grid>
+
+          <!-- 相似度 / 混合度（实测推荐值已预置） -->
+          <Grid Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="46"/>
+              <ColumnDefinition Width="20"/>
+              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="46"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="相似度" Foreground="{DynamicResource Brush.Text.Secondary}"
+                       VerticalAlignment="Center" Margin="0,0,8,0"
+                       ToolTip="归一化平方色差（不是百分比）。实测 0.05 可用：太小绿边残留，太大主体被一起抠掉"/>
+            <Slider Grid.Column="1" x:Name="SimSlider" Minimum="0.01" Maximum="0.40"
+                    Value="0.05" VerticalAlignment="Center"
+                    ValueChanged="Sim_ValueChanged"/>
+            <TextBlock Grid.Column="2" x:Name="SimText" Foreground="{DynamicResource Brush.Pvw}" FontSize="12"
+                       VerticalAlignment="Center" HorizontalAlignment="Right" Text="0.05"/>
+            <TextBlock Grid.Column="4" Text="混合度" Foreground="{DynamicResource Brush.Text.Secondary}"
+                       VerticalAlignment="Center" Margin="0,0,8,0"
+                       ToolTip="边缘过渡带宽度。实测 0.02 可用：太大会让主体边缘半透明（鬼影）"/>
+            <Slider Grid.Column="5" x:Name="BlendSlider" Minimum="0" Maximum="0.20"
+                    Value="0.02" VerticalAlignment="Center"
+                    ValueChanged="Blend_ValueChanged"/>
+            <TextBlock Grid.Column="6" x:Name="BlendText" Foreground="{DynamicResource Brush.Pvw}" FontSize="12"
+                       VerticalAlignment="Center" HorizontalAlignment="Right" Text="0.02"/>
+          </Grid>
+
+          <!-- 背景参数：纯色面板 / 文件面板 二选一 -->
+          <Grid Margin="0,8,0,0">
+            <StackPanel x:Name="BgColorPanel" Orientation="Horizontal">
+              <StackPanel.Resources>
+                <Style TargetType="Button" BasedOn="{StaticResource SwatchBtn}"/>
+              </StackPanel.Resources>
+              <TextBlock Text="背景颜色" Foreground="{DynamicResource Brush.Text.Secondary}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+              <Button Content="演播灰" Width="62" Height="24" Margin="0,0,4,0" Tag="0x1E1E1E"
+                      Background="{DynamicResource Brush.Bg.Raised}" Foreground="{DynamicResource Brush.Text}" BorderThickness="0" Click="BgSwatch_Click"/>
+              <Button Content="纯黑" Width="52" Height="24" Margin="0,0,4,0" Tag="0x000000"
+                      Background="{DynamicResource Brush.Bg.Raised}" Foreground="{DynamicResource Brush.Text}" BorderThickness="0" Click="BgSwatch_Click"/>
+              <Button Content="纯白" Width="52" Height="24" Margin="0,0,4,0" Tag="0xFFFFFF"
+                      Background="{DynamicResource Brush.Bg.Raised}" Foreground="{DynamicResource Brush.Text}" BorderThickness="0" Click="BgSwatch_Click"/>
+              <Button Content="蓝" Width="42" Height="24" Margin="0,0,4,0" Tag="0x1E3A8A"
+                      Background="{DynamicResource Brush.Bg.Raised}" Foreground="{DynamicResource Brush.Text}" BorderThickness="0" Click="BgSwatch_Click"/>
+              <Button Content="绿" Width="42" Height="24" Margin="0,0,10,0" Tag="0x14532D"
+                      Background="{DynamicResource Brush.Bg.Raised}" Foreground="{DynamicResource Brush.Text}" BorderThickness="0" Click="BgSwatch_Click"/>
+              <TextBox x:Name="BgColorHex" Width="100" Text="0x1E1E1E"/>
+            </StackPanel>
+            <StackPanel x:Name="BgFilePanel" Orientation="Horizontal" Visibility="Collapsed">
+              <TextBlock Text="背景文件" Foreground="{DynamicResource Brush.Text.Secondary}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+              <TextBox x:Name="BgPathBox" Width="430" IsReadOnly="True"/>
+              <Button Content="浏览…" Width="72" Height="26" Margin="8,0,0,0"
+                      Style="{StaticResource SwatchBtn}"
+                      Background="{DynamicResource Brush.Bg.Raised}" Foreground="{DynamicResource Brush.Text}" Click="BgBrowse_Click"/>
+            </StackPanel>
+          </Grid>
+
+          <!-- 合成画布 -->
+          <Grid Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="合成画布" Foreground="{DynamicResource Brush.Text.Secondary}"
+                       VerticalAlignment="Center" Margin="0,0,8,0"
+                       ToolTip="抠像合成后的画面尺寸：背景铺满这个尺寸，前景缩放到它。建议填与直播输出一致（默认 1920×1080）"/>
+            <TextBox Grid.Column="1" x:Name="BgWBox" Width="70" Text="1920"/>
+            <TextBlock Grid.Column="2" Text=" × " Foreground="{DynamicResource Brush.Text.Muted}" VerticalAlignment="Center"/>
+            <TextBox Grid.Column="3" x:Name="BgHBox" Width="70" Text="1080"/>
+          </Grid>
+        </StackPanel>
+
+        <TextBlock x:Name="ChromaHint" Style="{StaticResource Hint}" Margin="0,7,0,0"
+                   Text="抠像必须走 ffmpeg 预处理链路（上面「采集链路」选 VLC 直连时抠像不生效）。设好后点下方「添加为输入」，效果会同时出现在预览框与输出。"/>
+      </StackPanel>
+    </Border>
+
+    <!-- 状态行：如实反馈扫描结果 / 错误原因 -->
+    <TextBlock Grid.Row="5" x:Name="StatusLine" Style="{StaticResource Hint}"
+               Margin="0,8,0,0" Text="正在扫描采集设备…"/>
+
+    <!-- 底部按钮 -->
+    <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+      <Button Content="重新扫描" Width="100" Height="32" Margin="0,0,10,0"
+              Background="{DynamicResource Brush.Bg.Raised}" Foreground="{DynamicResource Brush.Text}" Click="Rescan_Click"/>
+      <Button Content="添加为输入" x:Name="BtnAdd" Width="130" Height="32" Margin="0,0,10,0"
+              Background="{DynamicResource Brush.Ok}" Foreground="{DynamicResource Brush.Text}" FontWeight="Bold"
+              IsEnabled="False" Click="Add_Click"/>
+      <!-- 「关闭」= 退出/取消，不是主操作：改中性底色，别让琥珀色抢过左边绿色的「添加为输入」 -->
+      <Button Content="关闭" Width="110" Height="32"
+              Background="{DynamicResource Brush.Bg.Raised}" Foreground="{DynamicResource Brush.Text}"
+              BorderBrush="{DynamicResource Brush.Bg.StatusBar}" BorderThickness="1" Click="Close_Click"/>
+    </StackPanel>
+  </Grid>
+  </ScrollViewer>
+</Window>

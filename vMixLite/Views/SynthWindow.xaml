@@ -1,0 +1,139 @@
+<Window x:Class="Cutlance.Views.SynthWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Cutlance 切换台"
+        Height="860" Width="1320" MinHeight="620" MinWidth="980"
+        WindowStartupLocation="CenterOwner"
+        Style="{StaticResource AppWindow}">
+  <!--
+    P4 第一步：把内存合成器（C 方案）搬进产品，做成「监视窗 + 切换条」。
+
+    与主界面老链路的关系：
+      · 老链路：每路是 VLC 自己的 HwndHost 子窗口 + 顶层 Popup 叠加，
+        屏幕上"看起来"合成了，内存里没有成品帧，所以输出只能抓屏（被挡就没画面）。
+      · 本窗口：每路用 vmem 出帧到我们自己内存 → CPU 合成 → 成品帧。
+        成品帧真实存在，所以后面接推流/录制/全屏都不依赖屏幕，被遮挡也照常出画。
+    这一版只做「切换台 + 监看 + 输出」，工程里的图层/叠加还在老界面，后续逐步移过来。
+  -->
+  <Grid Margin="10">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="*"/>        <!-- 监看区 -->
+      <RowDefinition Height="Auto"/>     <!-- 切换条 -->
+      <RowDefinition Height="Auto"/>     <!-- 状态 -->
+    </Grid.RowDefinitions>
+
+    <!-- ===================== ① 监看区：PGM 大窗 + PVW 小窗 ===================== -->
+    <Grid Grid.Row="0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="330"/>
+      </Grid.ColumnDefinitions>
+
+      <!-- 节目（PGM）：观众看到的画面，红色标识 -->
+      <Border Grid.Column="0" Margin="0,0,8,0"
+              Background="{DynamicResource Brush.Bg.Sunken}"
+              BorderBrush="{DynamicResource Brush.Pgm}" BorderThickness="2"
+              CornerRadius="6">
+        <Grid>
+          <Image x:Name="PgmImage" Stretch="Uniform" />
+          <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8"
+                  Background="{DynamicResource Brush.Pgm}" CornerRadius="3" Padding="8,3">
+            <TextBlock Text="节目 PGM" Foreground="White" FontWeight="SemiBold" FontSize="12"/>
+          </Border>
+          <TextBlock x:Name="PgmName" HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                     Margin="10,0,0,8" Foreground="White" FontWeight="SemiBold" FontSize="15"/>
+        </Grid>
+      </Border>
+
+      <!-- 预监（PVW）：下一个要切出去的画面，青色标识（与主界面预览框同色） -->
+      <StackPanel Grid.Column="1">
+        <Border Height="186"
+                Background="{DynamicResource Brush.Bg.Sunken}"
+                BorderBrush="{DynamicResource Brush.Pvw}" BorderThickness="2"
+                CornerRadius="6">
+          <Grid>
+            <Image x:Name="PvwImage" Stretch="Uniform" />
+            <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8"
+                    Background="{DynamicResource Brush.Pvw}" CornerRadius="3" Padding="8,3">
+              <TextBlock Text="预监 PVW" Foreground="White" FontWeight="SemiBold" FontSize="11"/>
+            </Border>
+            <TextBlock x:Name="PvwName" HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                       Margin="10,0,0,8" Foreground="White" FontWeight="SemiBold" FontSize="12"/>
+          </Grid>
+        </Border>
+
+        <!-- 运行状态 -->
+        <Border Margin="0,8,0,0"
+                Background="{DynamicResource Brush.Bg.Panel}"
+                CornerRadius="6" Padding="10,8">
+          <StackPanel>
+            <TextBlock Text="合成" Foreground="{DynamicResource Brush.Text.Muted}" FontSize="11"/>
+            <TextBlock x:Name="StatText" Foreground="{DynamicResource Brush.Text}" FontSize="12"
+                       TextWrapping="Wrap" Margin="0,3,0,0"/>
+            <TextBlock x:Name="OutText" Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="12"
+                       TextWrapping="Wrap" Margin="0,6,0,0"/>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </Grid>
+
+    <!-- ===================== ② 切换条 ===================== -->
+    <Border Grid.Row="1" Margin="0,10,0,0" Padding="8"
+            Background="{DynamicResource Brush.Bg.Panel}"
+            BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1" CornerRadius="6">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+
+        <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Disabled">
+          <StackPanel x:Name="InputBar" Orientation="Horizontal"/>
+        </ScrollViewer>
+
+        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
+          <Button x:Name="CutBtn" Content="CUT" Style="{StaticResource BtnDanger}"
+                  Width="86" Height="46" FontSize="15" FontWeight="Bold"
+                  ToolTip="硬切：瞬间把预监推到节目（快捷键 Enter）"/>
+          <Button x:Name="AutoBtn" Content="AUTO" Style="{StaticResource BtnAccent}"
+                  Width="96" Height="46" FontSize="15" FontWeight="Bold" Margin="8,0,0,0"
+                  ToolTip="溶解转场（快捷键 A）"/>
+          <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+            <TextBlock Text="转场" Foreground="{DynamicResource Brush.Text.Muted}" FontSize="10"/>
+            <ComboBox x:Name="DurCombo" Width="78" Height="26" Margin="0,2,0,0"/>
+          </StackPanel>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- ===================== ③ 状态条 ===================== -->
+    <Grid Grid.Row="2" Margin="2,8,2,0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
+      </Grid.ColumnDefinitions>
+      <TextBlock x:Name="HintText" Grid.Column="0" VerticalAlignment="Center"
+                 Foreground="{DynamicResource Brush.Text.Muted}" FontSize="11"
+                 Text="点下方输入 = 送到预监；Enter = 硬切；A = 溶解；数字键 1-9 直接预监"/>
+      <StackPanel Grid.Column="1" Orientation="Horizontal">
+        <StackPanel Margin="0,0,8,0" VerticalAlignment="Center">
+          <TextBlock Text="帧率" Foreground="{DynamicResource Brush.Text.Muted}" FontSize="10"/>
+          <ComboBox x:Name="FpsCombo" Width="80" Height="24" Margin="0,2,0,0"
+                    ToolTip="节目帧率。切换后立即生效，并记进工程（下次打开还是这一档）；正在录制时请重开录制，否则文件帧率跟实际不符"/>
+        </StackPanel>
+        <StackPanel Margin="0,0,10,0" VerticalAlignment="Center">
+          <TextBlock Text="每段时长" Foreground="{DynamicResource Brush.Text.Muted}" FontSize="10"/>
+          <ComboBox x:Name="SegCombo" Width="104" Height="24" Margin="0,2,0,0"
+                    ToolTip="录制到设定时长自动封包存盘，并立刻接着录下一个文件（中间不断流、不丢帧）"/>
+        </StackPanel>
+        <Button x:Name="RecBtn" Content="● 录制" Style="{StaticResource BtnGhost}"
+                Height="28" Padding="12,0" ToolTip="按左边「每段时长」分段录制：到点自动存好并开新文件"/>
+        <Button x:Name="FsBtn" Content="全屏输出" Style="{StaticResource BtnGhost}"
+                Height="28" Padding="12,0" Margin="6,0,0,0"/>
+        <Button x:Name="CloseBtn" Content="关闭" Style="{StaticResource BtnGhost}"
+                Height="28" Padding="12,0" Margin="6,0,0,0"/>
+      </StackPanel>
+    </Grid>
+  </Grid>
+</Window>

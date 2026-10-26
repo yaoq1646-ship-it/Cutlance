@@ -1,0 +1,64 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>Cutlance</AssemblyName>
+    <RootNamespace>Cutlance</RootNamespace>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <!-- 合成器按行直拷像素用指针最快（Compositor.Blit），POC 里也是开 unsafe -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- 程序图标：exe 图标 + 窗口/任务栏图标都取这一份（多尺寸 ico，16~256 全含） -->
+    <ApplicationIcon>Assets\Cutlance.ico</ApplicationIcon>
+
+    <!-- ⚠ 2026-10-22：禁用 Roslyn 常驻编译服务器（VBCSCompiler）。
+         起因：编译时 dotnet.exe 在 PEModuleBuilder.Translate 里抛 AccessViolationException，
+         MSBuild 回退重编是成功的（产物完好），但崩溃会弹一个「dotnet.exe - 系统错误」的
+         模态框盖在老板屏幕上，导播中绝对不允许。
+         关掉常驻服务器 = 每次编译在 MSBuild 进程内完成，不给后台进程崩溃的机会。
+         代价：增量编译慢几百毫秒（本机 32 核，实测无感）。只影响构建，不影响程序运行时。 -->
+    <UseSharedCompilation>false</UseSharedCompilation>
+    <!-- 顺带关掉 MSBuild 节点复用：常驻节点退出时同样可能弹框 -->
+    <MSBuildNodeReuse>false</MSBuildNodeReuse>
+  </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="Assets\Cutlance.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="LibVLCSharp.WPF" Version="3.9.2" />
+    <PackageReference Include="System.Management" Version="8.0.0" />
+    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.21" />
+    <!--
+      NDI（Network Device Interface）：官方 SDK 的 .NET 包装层（MIT，零依赖）。
+      ⚠ 该包**只含托管包装**，不含也不授权 NDI 原生运行时（Processing.NDI.Lib.x64.dll）。
+      原生库按以下优先级在运行时查找（见 Services/NdiService.ResolveNdi）：
+        ① 程序输出目录 ② 系统目录（装了官方 NDI Runtime 就在这里）
+        ③ C:\Program Files\NewTek\NDI 6 Runtime\v6
+        ④ 本机 vMix 自带的副本（仅开发机兜底，正式部署应装官方 NDI Runtime）
+    -->
+    <PackageReference Include="NDILibDotNetCoreBase" Version="2024.7.22.1" />
+  </ItemGroup>
+  <!--
+    补丁：VideoLAN.LibVLC.Windows 3.0.21 NuGet 包不带 DirectShow 采集插件（libdshow_plugin.dll），
+    缺它摄像头 dshow:// 会报 "unable to open the MRL"。
+    此插件从本机完整版 VLC 3.0.x 复制，随编译自动复制到 libvlc\win-x64\plugins\access\。
+  -->
+  <ItemGroup>
+    <None Include="vlc-extras\**\*" CopyToOutputDirectory="PreserveNewest"
+          Link="libvlc\win-x64\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <!--
+    P4：内存合成引擎（C 方案）直接链接 POC 的源码，不复制、不改一份。
+    为什么用链接而不是拷进来：合成器/编码器是同一套东西，拷一份就会分叉 ——
+    以后在 POC 里修的坑（vmem 出帧、队列深度、分段录制）产品里拿不到，反过来也一样。
+    POC 工程（..\Synth\Synth.csproj）照常独立编译，互不影响。
+  -->
+  <ItemGroup>
+    <Compile Include="..\Synth\Engine\*.cs" Link="Synth\Engine\%(Filename)%(Extension)" />
+    <Compile Include="..\Synth\Output\*.cs" Link="Synth\Output\%(Filename)%(Extension)" />
+    <Compile Include="..\Synth\Trace.cs" Link="Synth\Trace.cs" />
+  </ItemGroup>
+</Project>

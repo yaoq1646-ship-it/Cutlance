@@ -1,0 +1,205 @@
+<UserControl x:Class="Cutlance.Views.GeometryPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             FontSize="11">
+  <UserControl.Resources>
+    <Style x:Key="Lbl" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="10"/>
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Muted}"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+      <Setter Property="Margin" Value="0,0,3,0"/>
+    </Style>
+    <Style x:Key="Num" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+      <Setter Property="Height" Value="20"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="FontSize" Value="11"/>
+      <Setter Property="TextAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="Margin" Value="0,0,8,0"/>
+    </Style>
+    <Style x:Key="Tiny" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+      <Setter Property="Height" Value="20"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Padding" Value="6,0"/>
+      <Setter Property="FontSize" Value="10"/>
+      <Setter Property="Margin" Value="0,0,4,0"/>
+    </Style>
+  </UserControl.Resources>
+
+  <Border Background="{DynamicResource Brush.Bg.Surface}"
+          BorderBrush="{DynamicResource Brush.Border}" BorderThickness="0,1,0,0">
+    <StackPanel>
+      <!-- 标题行：精调 · 目标名 + 收起/浮出 -->
+      <Grid Height="24" Background="{DynamicResource Brush.Bg.TitleBar}">
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0">
+          <TextBlock Text="精调" Foreground="{DynamicResource Brush.Text}" FontWeight="Bold" FontSize="11"/>
+          <TextBlock x:Name="TitleText" Text="（未选中）" Foreground="{DynamicResource Brush.Text.Secondary}"
+                     FontSize="10" Margin="6,0,0,0" TextTrimming="CharacterEllipsis"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,6,0">
+          <Button x:Name="BtnPopOut" Style="{StaticResource Tiny}" Content="浮出"
+                  Click="BtnPopOut_Click" ToolTip="拖出成一个可移动的大窗口（默认不挡播出画面）"/>
+          <Button x:Name="BtnCollapse" Style="{StaticResource Tiny}" Content="收起" Width="38"
+                  Click="BtnCollapse_Click" ToolTip="收起/展开面板（收起后只剩这一行标题）"/>
+        </StackPanel>
+      </Grid>
+
+      <StackPanel x:Name="Body" Margin="8,6,8,8">
+        <!-- 老板 2026-10-19 23:24：「介绍前面精调模板设置是什么目的，并加入面板说明文字」
+             这段就是面板的「说明书」，省得每次都要口头解释：
+               · 调的是**当前选中的那一路**（预览里选中的槽 / 输出里选中的图层），不是整个节目；
+               · X/Y、宽/高、描边改完立刻重排这一路，预览与输出同步；旋转/裁切改的是**输入源本身**；
+               · 「预览条上的存/应用」= 把这一套摆法存成模板，下次一键调回（这里只是改这一路，不涉及保存）。 -->
+        <TextBlock x:Name="PanelHint" FontSize="9" TextWrapping="Wrap" Margin="0,0,0,5"
+                   Foreground="{DynamicResource Brush.Text.Muted}"
+                   Text="调「当前选中的那一路」（预览槽或输出图层）：位置 / 大小 / 描边改完立刻生效，预览与输出同步；旋转 / 裁切改的是这一路输入本身。"/>
+
+        <!-- 位置 -->
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+          <TextBlock Text="X" Style="{StaticResource Lbl}"/>
+          <TextBox x:Name="BoxX" Style="{StaticResource Num}" Width="52"
+                   KeyDown="Num_KeyDown" LostFocus="Num_LostFocus"
+                   ToolTip="左上角横向位置（占画框百分比，可输小数）"/>
+          <TextBlock Text="Y" Style="{StaticResource Lbl}"/>
+          <TextBox x:Name="BoxY" Style="{StaticResource Num}" Width="52"
+                   KeyDown="Num_KeyDown" LostFocus="Num_LostFocus"
+                   ToolTip="左上角纵向位置（占画框百分比）"/>
+        </StackPanel>
+
+        <!-- 尺寸 + 锁比例 -->
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,1">
+          <TextBlock Text="宽" Style="{StaticResource Lbl}"/>
+          <TextBox x:Name="BoxW" Style="{StaticResource Num}" Width="52"
+                   KeyDown="Num_KeyDown" LostFocus="Num_LostFocus"
+                   ToolTip="宽度占画框百分比（100 = 正好铺满）；锁比例时改一边另一边跟着变"/>
+          <TextBlock Text="高" Style="{StaticResource Lbl}"/>
+          <TextBox x:Name="BoxH" Style="{StaticResource Num}" Width="52"
+                   KeyDown="Num_KeyDown" LostFocus="Num_LostFocus"
+                   ToolTip="高度占画框百分比（100 = 正好铺满）"/>
+          <CheckBox x:Name="ChkLock" Content="锁比例" FontSize="10" VerticalAlignment="Center"
+                    Checked="ChkLock_Changed" Unchecked="ChkLock_Changed"
+                    ToolTip="锁定宽高比：改宽时高按当前比例跟着变（取消后可自由拉伸）"/>
+        </StackPanel>
+        <!-- 最小/最大值提示（老板 2026-10-18）：范围随目标类型走，解锁比例时两边可各自不同 -->
+        <TextBlock x:Name="RangeHint" Text="范围 10–400%（100 = 正好铺满）" FontSize="9"
+                   Foreground="{DynamicResource Brush.Text.Muted}" Margin="0,0,0,5"
+                   ToolTip="超出范围会被自动钳到最近的边界值，输入框里显示的就是真实生效值"/>
+
+        <!-- 描边 -->
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+          <TextBlock Text="描边" Style="{StaticResource Lbl}"/>
+          <TextBox x:Name="BoxBorder" Style="{StaticResource Num}" Width="38"
+                   KeyDown="Num_KeyDown" LostFocus="Num_LostFocus" ToolTip="边框粗细（像素，0 = 无边框）"/>
+          <TextBlock Text="圆角" Style="{StaticResource Lbl}"/>
+          <TextBox x:Name="BoxRadius" Style="{StaticResource Num}" Width="38"
+                   KeyDown="Num_KeyDown" LostFocus="Num_LostFocus" ToolTip="边框圆角（像素）"/>
+          <Border x:Name="ColorSwatch" Width="18" Height="18" CornerRadius="2"
+                  BorderBrush="{DynamicResource Brush.Border.Strong}" BorderThickness="1"
+                  VerticalAlignment="Center" Cursor="Hand" MouseLeftButtonDown="ColorSwatch_Click"
+                  ToolTip="点击循环切换描边颜色（青 / 白 / 金 / 红 / 黑）"/>
+        </StackPanel>
+
+        <!-- 填充方式（2026-10-25 异形屏）：只对输出图层有效。
+             异形屏（超宽 LED、弧形拼接）上，等比内接会留两条大黑边；
+             铺满裁切 / 拉伸铺满才能填满屏幕。 -->
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+          <TextBlock Text="填充" Style="{StaticResource Lbl}"/>
+          <ComboBox x:Name="ComboFit" Width="84" Height="20" FontSize="10"
+                    SelectionChanged="ComboFit_Changed"
+                    ToolTip="画面怎么填进这一格：&#10;· 等比内接 = 保持比例，留黑边（默认）&#10;· 铺满裁切 = 填满且不变形，多出来的从中间裁掉&#10;· 拉伸铺满 = 填满但会变形（异形屏 1:1 像素映射用）">
+            <ComboBoxItem Content="等比内接" Tag="0" IsSelected="True"/>
+            <ComboBoxItem Content="铺满裁切" Tag="1"/>
+            <ComboBoxItem Content="拉伸铺满" Tag="2"/>
+          </ComboBox>
+          <TextBlock x:Name="FitHint" Text="留黑边" FontSize="9" Margin="6,0,0,0"
+                     VerticalAlignment="Center" Foreground="{DynamicResource Brush.Text.Muted}"/>
+        </StackPanel>
+
+        <!-- 阴影（2026-10-25 老板要求「图层边框 / 阴影」）：
+             跟描边一样画进成品帧 —— 推流 / 录制 / NDI / 全屏都带，直播中调也不会重开媒体。
+             四周均匀外扩（不做偏移）：分屏时格子贴边，偏移式投影会一边深、一边被裁掉。 -->
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+          <TextBlock Text="阴影" Style="{StaticResource Lbl}"/>
+          <TextBox x:Name="BoxShadow" Style="{StaticResource Num}" Width="38"
+                   KeyDown="Num_KeyDown" LostFocus="Shadow_LostFocus"
+                   ToolTip="阴影向外扩散的粗细（像素，0 = 无阴影）"/>
+          <TextBlock Text="浓淡" Style="{StaticResource Lbl}"/>
+          <TextBox x:Name="BoxShadowDeep" Style="{StaticResource Num}" Width="38"
+                   KeyDown="Num_KeyDown" LostFocus="Shadow_LostFocus"
+                   ToolTip="阴影浓度 0–100（越大越黑）"/>
+          <TextBlock x:Name="ShadowHint" Text="四周均匀" FontSize="9" Margin="6,0,0,0"
+                     VerticalAlignment="Center" Foreground="{DynamicResource Brush.Text.Muted}"/>
+        </StackPanel>
+
+        <!-- 不透明度（2026-10-24 老板要求）：只对输出图层有效（预览槽是取景用的，调透明没意义）
+             落点是合成器成品帧的逐层 alpha —— 所以推流 / 录制 / NDI / 全屏一起生效，
+             直播中拖这根滑杆也不会重开媒体，画面不会闪。 -->
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+          <TextBlock Text="不透明" Style="{StaticResource Lbl}"/>
+          <Slider x:Name="SldOpacity" Minimum="0" Maximum="100" Value="100" Width="118" Height="16"
+                  VerticalAlignment="Center" IsMoveToPointEnabled="True"
+                  ValueChanged="SldOpacity_Changed"
+                  ToolTip="输出画面里这一格的透明程度（100 = 完全不透明）。改的是成品帧，推流/录制一起变，且不会重开媒体"/>
+          <TextBlock x:Name="OpacityVal" Text="100%" FontSize="10" Width="36" TextAlignment="Right"
+                     Foreground="{DynamicResource Brush.Text.Secondary}" VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <!-- 去隔行（2026-10-24 老板要的 1080i 开关）：作用于这一路输入，预览与输出同时生效。
+             引擎早就有（ffmpeg yadif / VLC :deinterlace），以前只挂在采集卡那条路上，
+             文件输入没有入口 —— 这里补上。 -->
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+          <CheckBox x:Name="ChkDeinterlace" Content="去隔行" FontSize="10"
+                    VerticalAlignment="Center" Checked="ChkDeinterlace_Changed" Unchecked="ChkDeinterlace_Changed"
+                    ToolTip="隔行源（1080i）画面有横向锯齿时勾上：改用 ffmpeg yadif 输出逐行。会重开这一路媒体，画面闪一下"/>
+          <TextBlock x:Name="DeinterlaceHint" Text="1080i 有横丝才勾；逐行源勾了会变糊"
+                     FontSize="9" Margin="6,0,0,0" VerticalAlignment="Center"
+                     Foreground="{DynamicResource Brush.Text.Muted}"/>
+        </StackPanel>
+
+        <!-- 旋转 / 裁切 / 重置 -->
+        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+          <TextBlock Text="旋转" Style="{StaticResource Lbl}"/>
+          <ComboBox x:Name="ComboRotate" Width="62" Height="20" FontSize="10" Margin="0,0,6,0"
+                    SelectionChanged="ComboRotate_SelectionChanged"
+                    ToolTip="旋转作用于输入源（整路输入）：预览与输出都按这个角度">
+            <ComboBoxItem Content="0°" Tag="0" IsSelected="True"/>
+            <ComboBoxItem Content="90°" Tag="90"/>
+            <ComboBoxItem Content="180°" Tag="180"/>
+            <ComboBoxItem Content="270°" Tag="270"/>
+          </ComboBox>
+          <Button x:Name="BtnCrop" Style="{StaticResource Tiny}" Content="裁切…"
+                  Click="BtnCrop_Click" ToolTip="按百分比裁掉源画面的四边（X1/Y1 = 左/上，X2/Y2 = 右/下）"/>
+          <Button x:Name="BtnReset" Style="{StaticResource Tiny}" Content="重置"
+                  Click="BtnReset_Click" ToolTip="位置归零、宽高铺满整框（描边与旋转不动）"/>
+        </StackPanel>
+
+        <!-- 裁切（点「裁切…」展开）：作用于源，预览与输出同步 -->
+        <Border x:Name="CropBox" Visibility="Collapsed" Margin="0,5,0,0" Padding="6,5"
+                Background="{DynamicResource Brush.Bg.Sunken}" CornerRadius="3"
+                BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1">
+          <StackPanel>
+            <TextBlock Text="裁切（%）· 作用于源画面，预览与输出同步" FontSize="9"
+                       Foreground="{DynamicResource Brush.Text.Muted}" Margin="0,0,0,4"/>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+              <TextBlock Text="X1" Style="{StaticResource Lbl}"/>
+              <TextBox x:Name="BoxCropL" Style="{StaticResource Num}" Width="38" ToolTip="左边裁掉源宽的百分之几"/>
+              <TextBlock Text="Y1" Style="{StaticResource Lbl}"/>
+              <TextBox x:Name="BoxCropT" Style="{StaticResource Num}" Width="38" ToolTip="上边裁掉源高的百分之几"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="X2" Style="{StaticResource Lbl}"/>
+              <TextBox x:Name="BoxCropR" Style="{StaticResource Num}" Width="38" ToolTip="右边裁掉源宽的百分之几"/>
+              <TextBlock Text="Y2" Style="{StaticResource Lbl}"/>
+              <TextBox x:Name="BoxCropB" Style="{StaticResource Num}" Width="38" ToolTip="下边裁掉源高的百分之几"/>
+              <Button Style="{StaticResource Tiny}" Content="应用" Click="BtnCropApply_Click"
+                      ToolTip="应用裁切（会重开这一路输入的预处理，画面会闪一下）"/>
+              <Button Style="{StaticResource Tiny}" Content="清除" Click="BtnCropClear_Click"
+                      ToolTip="取消该输入的所有裁切"/>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</UserControl>

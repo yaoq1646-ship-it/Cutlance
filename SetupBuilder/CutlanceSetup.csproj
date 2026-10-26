@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Cutlance 安装程序（老板 2026-10-20：做成 setup.exe，拿去别的电脑上测）。
+
+    为什么是 net48 而不是 net8：
+      目标机可能根本没装 .NET 8；而这个安装器如果自己都要先装运行时，就成了鸡生蛋。
+      .NET Framework 4.8 在 Win10 1903+ / Win11 是系统自带的 → 双击即用，零前置条件。
+      软件本体仍然是 .NET 8 自包含（约 361MB），已经打进安装器里，装完即可运行。
+
+    payload.zip 以嵌入资源方式编进 exe：安装器本体 ~150MB 一个文件，
+    不需要旁边再放个压缩包（老板拿 U 盘拷来拷去最容易丢的就这种伴随文件）。
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>setup</AssemblyName>
+    <RootNamespace>CutlanceSetup</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\Cutlance.ico</ApplicationIcon>
+    <DebugType>none</DebugType>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <Version>1.0.0</Version>
+    <Company>Cutlance</Company>
+    <Product>Cutlance</Product>
+    <FileVersion>1.0.0.0</FileVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="Microsoft.CSharp" />
+    <!-- 「浏览…」选目录用 FolderBrowserDialog —— WPF 自己没有目录选择框 -->
+    <Reference Include="System.Windows.Forms" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="payload.zip" />
+    <!-- 随装的小卸载器（老板 2026-10-22：要从 Windows 里能删）。85KB，安装时写到程序目录。
+         为什么不让 setup.exe 自己兼任：setup.exe 不在安装目录里，用户把它删了，
+         注册表的卸载入口就成了死链接。 -->
+    <EmbeddedResource Include="Assets\CutlanceUninstall.exe" />
+  </ItemGroup>
+
+</Project>

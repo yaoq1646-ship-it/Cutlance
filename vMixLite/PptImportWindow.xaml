@@ -1,0 +1,87 @@
+<Window x:Class="Cutlance.PptImportWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="PPT 导入方式" Height="486" Width="580"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Style="{StaticResource AppWindow}">
+  <!-- 老板 2026-10-19 21:06 第 2 条：「ppt导入 要做选项」——
+       两种 PPT 必须分开走，因为能力边界完全不同：
+         ① 图片序列：调 PowerPoint 把每页导成 PNG（vMix 的 PowerPoint 输入做法）
+            → 不挡屏、PPT 可以关、能自动播；代价是动画 / 转场 / 声音全丢。
+         ② 视频采集：全屏放映 + 抓放映窗口（vMix 的 Desktop Capture 做法）
+            → 动画 / 转场 / 视频都能播；代价是放映窗必须一直可见，且要占一块屏。
+       选哪个由导入的人自己定，不再由程序猜。 -->
+
+  <Grid Margin="16">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>   <!-- 顶部说明 -->
+      <RowDefinition Height="Auto"/>   <!-- 方式 ① -->
+      <RowDefinition Height="Auto"/>   <!-- 方式 ② -->
+      <RowDefinition Height="Auto"/>   <!-- 声音 -->
+      <RowDefinition Height="*"/>      <!-- 留白 -->
+      <RowDefinition Height="Auto"/>   <!-- 底部按钮 -->
+    </Grid.RowDefinitions>
+
+    <TextBlock Grid.Row="0" Margin="0,0,0,12" TextWrapping="Wrap"
+               Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="12"
+               Text="PPT 有两种导法，按这份 PPT 有没有动画来选："/>
+
+    <!-- ===== ① 图片序列 ===== -->
+    <Border x:Name="CardImage" Grid.Row="1" Background="{DynamicResource Brush.Bg.Surface}"
+            BorderBrush="{DynamicResource Brush.Border}" BorderThickness="2"
+            CornerRadius="6" Padding="14,12" Margin="0,0,0,10">
+      <RadioButton x:Name="RbImage" GroupName="PptMode" VerticalContentAlignment="Top"
+                   Checked="RbMode_Checked" Unchecked="RbMode_Unchecked">
+        <StackPanel Margin="4,2,0,0">
+          <TextBlock Text="① 图片序列 —— PPT 没有动画、没有转场、没有声音时选这个"
+                     Foreground="{DynamicResource Brush.Text}" FontSize="14" FontWeight="Bold"/>
+          <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" FontSize="12"
+                     Foreground="{DynamicResource Brush.Text.Secondary}"
+                     Text="让 PowerPoint 把每一页导成一张图，翻页 = 换一张图。不挡屏、PowerPoint 关掉也能继续播，还可以设自动播放。&#x0a;代价：动画、转场、视频、音效都不会出现（这也是 vMix 官方 PowerPoint 输入的同一个限制）。"/>
+        </StackPanel>
+      </RadioButton>
+    </Border>
+
+    <!-- ===== ② 视频采集 ===== -->
+    <Border x:Name="CardCapture" Grid.Row="2" Background="{DynamicResource Brush.Bg.Surface}"
+            BorderBrush="{DynamicResource Brush.Accent}" BorderThickness="2"
+            CornerRadius="6" Padding="14,12">
+      <RadioButton x:Name="RbCapture" GroupName="PptMode" IsChecked="True"
+                   VerticalContentAlignment="Top"
+                   Checked="RbMode_Checked" Unchecked="RbMode_Unchecked">
+        <StackPanel Margin="4,2,0,0">
+          <TextBlock Text="② 视频采集 —— PPT 有动画、转场、内嵌视频或声音时选这个"
+                     Foreground="{DynamicResource Brush.Text}" FontSize="14" FontWeight="Bold"/>
+          <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" FontSize="12"
+                     Foreground="{DynamicResource Brush.Text.Secondary}"
+                     Text="启动 PowerPoint 全屏放映，再把放映窗口那块的画面采进来。动画由 PowerPoint 自己驱动：按一次 PageDown 走一个动画步，动画播完才翻到下一页。&#x0a;代价：放映窗口必须一直摆在最前面、不能被别的窗口盖住（抓的是屏幕像素）；双屏时建议让放映独占一块屏。"/>
+        </StackPanel>
+      </RadioButton>
+    </Border>
+
+    <!-- ===== 声音 ===== -->
+    <Border Grid.Row="3" Background="{DynamicResource Brush.Bg.Panel}"
+            BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
+            CornerRadius="6" Padding="14,10" Margin="0,10,0,0">
+      <StackPanel>
+        <StackPanel Orientation="Horizontal">
+          <TextBlock Text="声音来源" VerticalAlignment="Center" FontSize="12"
+                     Foreground="{DynamicResource Brush.Text}"/>
+          <ComboBox x:Name="CmbAudio" Width="330" Height="26" Margin="12,0,0,0" FontSize="12"/>
+        </StackPanel>
+        <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" FontSize="11"
+                   Foreground="{DynamicResource Brush.Text.Muted}"
+                   Text="抓屏本身只有画面。要让 PPT 里的音效 / 视频声音进直播，得有一路“回环”录音设备：把系统播放设备指到它（如 VB-Audio Cable、立体声混音），再在这里选中它。没有回环设备就选「不采集声音」，PPT 的画面照样播。"/>
+      </StackPanel>
+    </Border>
+
+    <!-- ===== 底部按钮 ===== -->
+    <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right">
+      <Button x:Name="BtnCancel" Content="取消" Style="{StaticResource BtnGhost}"
+              Width="96" Height="32" Margin="0,0,10,0" IsCancel="True" Click="BtnCancel_Click"/>
+      <Button x:Name="BtnOk" Content="选文件并导入" Style="{StaticResource BtnPrimary}"
+              Width="132" Height="32" IsDefault="True" Click="BtnOk_Click"/>
+    </StackPanel>
+  </Grid>
+</Window>

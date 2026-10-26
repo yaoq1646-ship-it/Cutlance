@@ -1,0 +1,156 @@
+﻿<Window x:Class="Cutlance.CountdownWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="倒计时 / 触发器" Height="720" Width="500"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Style="{StaticResource AppWindow}">
+  <!-- 内容整体可滚：1366x768@125%（可用高 582 DIP）这类小屏装不下，窗口由 Services/WindowFit
+       收敛到可用区后，靠这里滚动保证底部「关闭」等控件够得到。 -->
+  <Window.Resources>
+    <Style x:Key="Lbl" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}"/>
+      <Setter Property="Margin" Value="0,12,0,4"/>
+    </Style>
+    <Style x:Key="CtlBtn" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+      <Setter Property="Background" Value="{DynamicResource Brush.Bg.Raised}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text}"/>
+      <Setter Property="Height" Value="34"/>
+      <Setter Property="Width" Value="102"/>
+      <Setter Property="Margin" Value="0,0,8,0"/>
+      <Setter Property="FontSize" Value="13"/>
+    </Style>
+    <Style x:Key="Txt" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+      <Setter Property="Background" Value="{DynamicResource Brush.Bg.Surface}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+      <Setter Property="Height" Value="26"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="Padding" Value="6,0"/>
+    </Style>
+    <!-- 时刻模式的快捷按钮：紧凑小钮，别抢主操作的视觉权重 -->
+    <Style x:Key="MiniBtn" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+      <Setter Property="Background" Value="{DynamicResource Brush.Bg.Raised}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Bg.StatusBar}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Height" Value="26"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Padding" Value="8,0"/>
+      <Setter Property="Margin" Value="6,0,0,0"/>
+      <Setter Property="FontSize" Value="11"/>
+    </Style>
+  </Window.Resources>
+
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+  <StackPanel Margin="16">
+    <!-- 大字剩余时间 -->
+    <Border Background="{DynamicResource Brush.Bg.Sunken}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
+            CornerRadius="4" Padding="0,14">
+      <TextBlock x:Name="BigTime" Text="01:00" Foreground="{DynamicResource Brush.Pvw}" FontSize="54"
+                 FontFamily="Consolas" FontWeight="Bold" HorizontalAlignment="Center"/>
+    </Border>
+
+    <StackPanel Orientation="Horizontal" Margin="0,14,0,0" HorizontalAlignment="Center">
+      <Button x:Name="BtnStart" Style="{StaticResource CtlBtn}" Click="BtnStart_Click">
+        <StackPanel Orientation="Horizontal"><Path Style="{StaticResource IconSolid}" Data="{StaticResource Icon.Play}" Width="13" Height="13" VerticalAlignment="Center"/><TextBlock Text="开始" Margin="5,0,0,0" VerticalAlignment="Center"/></StackPanel>
+      </Button>
+      <!-- ⚠ 暂停钮的文字/图标必须命名：OnState 里要切换它们。
+           以前直接写 BtnPause.Content = "▶ 继续" 会把整个图标 StackPanel 覆盖成纯文字，图标一去不回。 -->
+      <Button x:Name="BtnPause" Style="{StaticResource CtlBtn}" Click="BtnPause_Click">
+        <StackPanel Orientation="Horizontal">
+          <Path x:Name="IcoPause" Style="{StaticResource IconSolid}" Data="{StaticResource Icon.Pause}" Width="13" Height="13" VerticalAlignment="Center"/>
+          <TextBlock x:Name="TxtPause" Text="暂停" Margin="5,0,0,0" VerticalAlignment="Center"/>
+        </StackPanel>
+      </Button>
+      <Button x:Name="BtnReset" Style="{StaticResource CtlBtn}" Click="BtnReset_Click">
+        <StackPanel Orientation="Horizontal"><Path Style="{StaticResource IconLine}" Data="{StaticResource Icon.Reset}" Width="13" Height="13" VerticalAlignment="Center"/><TextBlock Text="复位" Margin="5,0,0,0" VerticalAlignment="Center"/></StackPanel>
+      </Button>
+    </StackPanel>
+
+    <TextBlock x:Name="StatusLine" Text="就绪" Foreground="{DynamicResource Brush.Text.Muted}" FontSize="11"
+               HorizontalAlignment="Center" Margin="0,10,0,0" TextWrapping="Wrap"/>
+
+    <Border Height="1" Background="{DynamicResource Brush.Border}" Margin="0,16,0,2"/>
+
+    <TextBlock Text="倒计时方式" Style="{StaticResource Lbl}"/>
+    <ComboBox x:Name="ModeCombo" Height="28" Background="{DynamicResource Brush.Bg.Surface}"
+              SelectionChanged="ModeCombo_SelectionChanged">
+      <ComboBoxItem Content="按时长倒计时" Tag="duration"/>
+      <ComboBoxItem Content="到指定时刻（按电脑时间）" Tag="until"/>
+    </ComboBox>
+
+    <!-- ===== 模式一：时长 ===== -->
+    <StackPanel x:Name="PanelDuration" Margin="0,10,0,0">
+      <StackPanel Orientation="Horizontal">
+        <TextBox x:Name="TxtDuration" Width="96" Text="60" Style="{StaticResource Txt}"
+                 TextChanged="TxtDuration_TextChanged"/>
+        <TextBlock Text="秒（可填小数）" Foreground="{DynamicResource Brush.Text.Secondary}"
+                   VerticalAlignment="Center" Margin="8,0,0,0" FontSize="12"/>
+        <CheckBox x:Name="ChkRepeat" Content="循环" Foreground="{DynamicResource Brush.Text}"
+                  VerticalAlignment="Center" Margin="16,0,0,0" FontSize="12" Click="ChkRepeat_Click"/>
+      </StackPanel>
+      <TextBlock x:Name="TxtRepeatHint" Foreground="{DynamicResource Brush.Text.Muted}" FontSize="10"
+                 TextWrapping="Wrap" Margin="0,6,0,0" Text="勾选后到点会立刻重新开始下一轮。"/>
+    </StackPanel>
+
+    <!-- ===== 模式二：到指定时刻 ===== -->
+    <StackPanel x:Name="PanelUntil" Margin="0,10,0,0" Visibility="Collapsed">
+      <StackPanel Orientation="Horizontal">
+        <TextBox x:Name="TxtTargetTime" Width="140" Text="21:00" Style="{StaticResource Txt}"
+                 TextChanged="TxtTargetTime_TextChanged" ToolTip="支持 HH:mm、HH:mm:ss、MM-dd HH:mm、yyyy-MM-dd HH:mm:ss"/>
+        <Button x:Name="BtnQuick1m" Content="+1 分钟" Tag="1" Style="{StaticResource MiniBtn}" Click="BtnQuickTime_Click"/>
+        <Button x:Name="BtnQuick5m" Content="+5 分钟" Tag="5" Style="{StaticResource MiniBtn}" Click="BtnQuickTime_Click"/>
+        <Button x:Name="BtnQuickHour" Content="下个整点" Tag="hour" Style="{StaticResource MiniBtn}" Click="BtnQuickTime_Click"/>
+      </StackPanel>
+      <TextBlock x:Name="TxtUntilHint" Foreground="{DynamicResource Brush.Text.Muted}" FontSize="10"
+                 TextWrapping="Wrap" Margin="0,6,0,0"
+                 Text="按电脑当前时间倒数到该时刻。只填时间（如 21:00）＝今天，已过则自动顺延到明天；也可填 10-20 21:00 或 2026-10-20 21:00:00 指定日期。"/>
+    </StackPanel>
+
+    <TextBlock Text="到点执行的动作" Style="{StaticResource Lbl}"/>
+    <ComboBox x:Name="ActionCombo" Background="{DynamicResource Brush.Bg.Surface}" Height="28"
+              SelectionChanged="ActionCombo_SelectionChanged"/>
+
+    <!-- ===== 动作参数：按所选动作切换（各占一份，只显示一份，避免把窗口撑高） ===== -->
+
+    <!-- 需要「目标序号」的动作 -->
+    <StackPanel x:Name="PanelTarget">
+      <TextBlock Text="动作的目标序号（输入源序号 / 叠加通道号 / 播放列表项序号）" Style="{StaticResource Lbl}"/>
+      <StackPanel Orientation="Horizontal">
+        <TextBox x:Name="TxtTarget" Width="96" Text="1" Style="{StaticResource Txt}"
+                 TextChanged="TxtTarget_TextChanged"/>
+        <TextBlock x:Name="TargetHint" Foreground="{DynamicResource Brush.Text.Muted}" FontSize="11"
+                   VerticalAlignment="Center" Margin="12,0,0,0" Text=""/>
+      </StackPanel>
+    </StackPanel>
+
+    <!-- 「弹框提醒」：不要目标序号，改成填提醒文字 -->
+    <StackPanel x:Name="PanelRemind" Visibility="Collapsed">
+      <TextBlock Text="提醒文字（到点后弹框显示这句）" Style="{StaticResource Lbl}"/>
+      <TextBox x:Name="TxtRemind" Text="请录制推流" Style="{StaticResource Txt}"
+               TextChanged="TxtRemind_TextChanged"/>
+      <TextBlock Foreground="{DynamicResource Brush.Text.Muted}" FontSize="10" TextWrapping="Wrap" Margin="0,6,0,0"
+                 Text="到点弹「置顶」的系统提醒框：点「是」＝立即开始推流 / 录制，点「否」＝只关掉提醒。"/>
+    </StackPanel>
+
+    <TextBlock Text="把剩余时间显示到画面上（可选）" Style="{StaticResource Lbl}"/>
+    <StackPanel Orientation="Horizontal">
+      <TextBlock Text="第" Foreground="{DynamicResource Brush.Text.Secondary}" VerticalAlignment="Center"/>
+      <TextBox x:Name="TxtOvChannel" Width="52" Text="0" Margin="6,0" Style="{StaticResource Txt}"
+               TextChanged="TxtOvChannel_TextChanged"/>
+      <TextBlock Text="号叠加通道（0 = 不显示）" Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="12"
+                 VerticalAlignment="Center"/>
+      <TextBox x:Name="TxtFormat" Width="128" Text="倒计时 {t}" Margin="14,0,0,0"
+               Style="{StaticResource Txt}" TextChanged="TxtFormat_TextChanged"/>
+    </StackPanel>
+
+    <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Brush.Text.Muted}" FontSize="10" Margin="0,14,0,0"
+               Text="说明：{t} 会被替换成剩余时间（≥1 分钟显示 mm:ss，不足 1 分钟显示 ss.s）。归零时执行上面选的动作。要显示到画面，请先用主界面的「+文字」在该编号的叠加通道里放点内容（空的通道会自动补一个文字）。"/>
+
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+      <Button Content="关闭" Width="110" Height="32" Background="{DynamicResource Brush.Bg.Raised}" Foreground="{DynamicResource Brush.Text}"
+              Click="Close_Click"/>
+    </StackPanel>
+  </StackPanel>
+  </ScrollViewer>
+</Window>

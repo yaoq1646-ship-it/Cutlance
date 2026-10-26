@@ -1,0 +1,66 @@
+<Window x:Class="Cutlance.HotkeyNoticeWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Cutlance · 外设键盘说明" Width="580" Height="330"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize" ShowInTaskbar="False"
+        Style="{StaticResource AppWindow}">
+  <Window.Resources>
+    <!-- 铁律③：本地 keyed 样式必须 BasedOn 隐式样式，否则退回系统浅色模板 -->
+    <Style x:Key="DlgBtn" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+      <Setter Property="Height" Value="30"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="MinWidth" Value="96"/>
+      <Setter Property="Padding" Value="14,0"/>
+      <Setter Property="Margin" Value="8,0,0,0"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="Background" Value="{DynamicResource Brush.Bg.Raised}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text}"/>
+    </Style>
+    <Style x:Key="DlgBtnPrimary" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+      <Setter Property="Height" Value="30"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="MinWidth" Value="110"/>
+      <Setter Property="Padding" Value="14,0"/>
+      <Setter Property="Margin" Value="8,0,0,0"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="FontWeight" Value="Bold"/>
+      <Setter Property="Background" Value="{DynamicResource Brush.Pvw}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Bg.Base}"/>
+      <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+  </Window.Resources>
+
+  <DockPanel Margin="16">
+
+    <!-- ===== 底部按钮：只有单击「确定」才继续 =====
+         老板 2026-10-18：「要加上关闭键，方便进行下一步动作」——
+         原来的「取消」在语义上容易被当成"撤销操作"，改成明确的「关闭」；
+         它仍是 IsCancel，所以 Esc 也能关（点击关闭 = 返回上一步，不进入快捷键设置）。 -->
+    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+      <Button x:Name="BtnCancel" Style="{StaticResource DlgBtn}" Content="关闭 (Esc)" IsCancel="True" Click="BtnCancel_Click"/>
+      <Button x:Name="BtnOk" Style="{StaticResource DlgBtnPrimary}" Content="确定，进入设置" IsDefault="True" Click="BtnOk_Click"/>
+    </StackPanel>
+
+    <!-- ===== 红字警示 ===== -->
+    <Border DockPanel.Dock="Top" Background="{DynamicResource Brush.Pgm.Dim}"
+            BorderBrush="{DynamicResource Brush.Pgm}" BorderThickness="1"
+            CornerRadius="4" Padding="10,8" Margin="0,0,0,12">
+      <TextBlock Foreground="{DynamicResource Brush.Pgm}" FontSize="14" FontWeight="Bold"
+                 TextWrapping="Wrap"
+                 Text="⚠ 本软件暂不支持需要 SDK（厂商专用驱动）的外设键盘。"/>
+    </Border>
+
+    <StackPanel>
+      <TextBlock Foreground="{DynamicResource Brush.Text}" FontSize="12" TextWrapping="Wrap"
+                 Text="这类外设不向 Windows 发送标准键盘按键，而是通过厂商自己的 SDK / 专用驱动与电脑通信 —— 本程序收不到它的按键，也无法通过任何设置绕过。"/>
+      <TextBlock Foreground="{DynamicResource Brush.Text}" FontSize="12" FontWeight="Bold"
+                 TextWrapping="Wrap" Margin="0,12,0,0" Text="怎么判断自己的外设属于哪一类："/>
+      <TextBlock Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0"
+                 Text="把外设插上，打开「记事本」按一下它的按键 —— 屏幕上打出了字符（数字、字母或功能键），说明它是「标准键盘」，可以正常绑定；如果什么都没出现，那它多半需要厂商 SDK。"/>
+      <TextBlock Foreground="{DynamicResource Brush.Text.Muted}" FontSize="11" TextWrapping="Wrap" Margin="0,10,0,0"
+                 Text="绝大多数导播键盘、USB 小键盘、脚踏开关在系统里就是「标准键盘」，不受此限制。"/>
+      <TextBlock Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="11" TextWrapping="Wrap" Margin="0,10,0,0"
+                 Text="单击「确定，进入设置」后开始绑定快捷键；单击「关闭」返回，不影响当前正在进行的导播。"/>
+    </StackPanel>
+  </DockPanel>
+</Window>

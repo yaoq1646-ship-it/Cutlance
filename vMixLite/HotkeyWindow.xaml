@@ -1,0 +1,163 @@
+﻿<Window x:Class="Cutlance.HotkeyWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="导播键盘 / 快捷键" Height="800" Width="920"
+        WindowStartupLocation="CenterOwner" MinWidth="720" MinHeight="480"
+        Style="{StaticResource AppWindow}"
+        PreviewKeyDown="Window_PreviewKeyDown">
+  <Window.Resources>
+    <!-- 紧凑小钮：别抢「设定」的视觉权重 -->
+    <Style x:Key="MiniBtn" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+      <Setter Property="Background" Value="{DynamicResource Brush.Bg.Raised}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Bg.StatusBar}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Height" Value="26"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Padding" Value="10,0"/>
+      <Setter Property="Margin" Value="0,0,6,0"/>
+      <Setter Property="FontSize" Value="11"/>
+    </Style>
+    <!-- 「设定」= 本窗口的主操作，用青蓝色区分出来 -->
+    <Style x:Key="SetBtn" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+      <Setter Property="Background" Value="{DynamicResource Brush.Pvw}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Bg.Base}"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="FontWeight" Value="Bold"/>
+      <Setter Property="Height" Value="26"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Width" Value="62"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Margin" Value="0,0,6,0"/>
+      <Setter Property="FontSize" Value="11"/>
+    </Style>
+  </Window.Resources>
+
+  <DockPanel Margin="14">
+
+    <!-- ===== 顶部说明 ===== -->
+    <Border DockPanel.Dock="Top" Background="{DynamicResource Brush.Info.Bg}"
+            BorderBrush="{DynamicResource Brush.Info.Border}" BorderThickness="1"
+            CornerRadius="4" Padding="10,8" Margin="0,0,0,10">
+      <StackPanel>
+        <TextBlock Text="把外设导播键盘（USB 小键盘 / 脚踏开关 / 带宏的键盘都算）上的按键，绑到下面的导播动作上。"
+                   Foreground="{DynamicResource Brush.Info.Text}" FontSize="12" TextWrapping="Wrap"/>
+        <TextBlock Text="点某行的「设定」→ 按键格里出现「请按外设上的键…」→ 直接按下那个键即可（按 Esc 取消）。录键那一小段时间里全局快捷键暂停响应，录完立刻恢复。"
+                   Foreground="{DynamicResource Brush.Info.Text}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0"/>
+        <!-- ★ 红字警示：需要 SDK / 厂商专用驱动的外设键盘，本软件接不到 -->
+        <Border Background="{DynamicResource Brush.Pgm.Dim}" BorderBrush="{DynamicResource Brush.Pgm}"
+                BorderThickness="1" CornerRadius="3" Padding="8,6" Margin="0,8,0,0">
+          <StackPanel>
+            <TextBlock Foreground="{DynamicResource Brush.Pgm}" FontSize="12" FontWeight="Bold"
+                       TextWrapping="Wrap"
+                       Text="⚠ 本软件暂不支持需要 SDK（厂商专用驱动）的外设键盘。"/>
+            <TextBlock Foreground="{DynamicResource Brush.Pgm}" FontSize="11" TextWrapping="Wrap" Margin="0,3,0,0"
+                       Text="这类设备不向系统发送标准键盘按键，程序收不到，也无法通过本设置解决。&#10;绝大多数导播键盘、USB 小键盘、脚踏开关在系统里就是「标准键盘」，不受影响。"/>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </Border>
+
+    <!-- ===== 选项行 ===== -->
+    <Border DockPanel.Dock="Top" Background="{DynamicResource Brush.Bg.Panel}"
+            BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
+            CornerRadius="4" Padding="10,8" Margin="0,0,0,10">
+      <StackPanel>
+        <CheckBox x:Name="ChkGlobal" Content="全局生效：程序在后台（主窗没有焦点）时也响应外设按键"
+                  Foreground="{DynamicResource Brush.Text}" Click="ChkGlobal_Click"/>
+        <TextBlock x:Name="GlobalHint" Foreground="{DynamicResource Brush.Text.Muted}" FontSize="11"
+                   TextWrapping="Wrap" Margin="20,5,0,0"
+                   Text="后台生效的按键规则：只响应【带修饰键的组合】（如 Ctrl+1、Alt+CUT）与【F1-F24 / 小键盘键】。&#10;纯字母、纯数字、空格这类单键在后台不响应 —— 否则你在别的软件里打字会连着触发导播动作。主窗在前台时全部照常响应。"/>
+        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+          <Button x:Name="BtnResetAll" Style="{StaticResource MiniBtn}" Content="全部恢复默认" Click="BtnResetAll_Click"/>
+          <Button x:Name="BtnClearAll" Style="{StaticResource MiniBtn}" Content="全部清空" Click="BtnClearAll_Click"/>
+          <TextBlock x:Name="StatusLine" Foreground="{DynamicResource Brush.Text.Secondary}" FontSize="11"
+                     VerticalAlignment="Center" Margin="8,0,0,0" Text=""/>
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <!-- ===== 底部 ===== -->
+    <Grid DockPanel.Dock="Bottom" Margin="0,10,0,0">
+      <TextBlock x:Name="FootHint" Foreground="{DynamicResource Brush.Text.Muted}" FontSize="11"
+                 VerticalAlignment="Center"
+                 Text="改完即时生效并自动保存到 %APPDATA%\Cutlance\hotkeys.json（与工程文件无关，换工程也照用）"/>
+      <!-- ⚠ Style 只能给一处：这里走 Button.Style 元素，属性上就不要再写 Style=，否则 XAML 解析期直接抛异常 -->
+      <Button x:Name="BtnClose" Content="关闭" Click="BtnClose_Click">
+        <Button.Style>
+          <Style TargetType="Button" BasedOn="{StaticResource MiniBtn}">
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="Width" Value="92"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Background" Value="{DynamicResource Brush.Bg.Raised}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Text}"/>
+          </Style>
+        </Button.Style>
+      </Button>
+    </Grid>
+
+    <!-- ===== 动作列表（按分组显示） ===== -->
+    <Border Background="{DynamicResource Brush.Bg.Surface}" BorderBrush="{DynamicResource Brush.Border}"
+            BorderThickness="1" CornerRadius="4" Padding="1">
+      <ListBox x:Name="HotkeyList" Background="Transparent" BorderThickness="0"
+               ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+               HorizontalContentAlignment="Stretch">
+        <ListBox.GroupStyle>
+          <GroupStyle>
+            <GroupStyle.ContainerStyle>
+              <Style TargetType="GroupItem">
+                <Setter Property="Template">
+                  <Setter.Value>
+                    <ControlTemplate TargetType="GroupItem">
+                      <StackPanel>
+                        <Border Background="{DynamicResource Brush.Bg.TitleBar}" CornerRadius="3"
+                                Padding="8,5" Margin="6,8,6,4">
+                          <TextBlock Text="{Binding Name}" Foreground="{DynamicResource Brush.Text}"
+                                     FontWeight="Bold" FontSize="12"/>
+                        </Border>
+                        <ItemsPresenter/>
+                      </StackPanel>
+                    </ControlTemplate>
+                  </Setter.Value>
+                </Setter>
+              </Style>
+            </GroupStyle.ContainerStyle>
+          </GroupStyle>
+        </ListBox.GroupStyle>
+        <ListBox.ItemTemplate>
+          <DataTemplate>
+            <Border Background="{DynamicResource Brush.Bg.Panel}" BorderBrush="{DynamicResource Brush.Border}"
+                    BorderThickness="1" CornerRadius="3" Margin="6,0,6,4" Padding="8,6">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="172"/>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding Title}" Foreground="{DynamicResource Brush.Text}" FontSize="12"/>
+                  <TextBlock Text="{Binding Hint}" Foreground="{DynamicResource Brush.Text.Muted}" FontSize="10"
+                             TextTrimming="CharacterEllipsis"/>
+                </StackPanel>
+                <!-- 当前按键 -->
+                <Border Grid.Column="1" Background="{DynamicResource Brush.Bg.Sunken}"
+                        BorderBrush="{DynamicResource Brush.Border.Strong}" BorderThickness="1"
+                        CornerRadius="3" Height="28" Margin="8,0">
+                  <TextBlock Text="{Binding ComboDisplay}" FontFamily="Consolas" FontSize="13"
+                             HorizontalAlignment="Center" VerticalAlignment="Center"
+                             Foreground="{Binding ComboBrush}"/>
+                </Border>
+                <Button Grid.Column="2" Style="{StaticResource SetBtn}" Content="设定"
+                        Click="SetBtn_Click" Tag="{Binding}"/>
+                <Button Grid.Column="3" Style="{StaticResource MiniBtn}" Content="清除"
+                        Click="ClearBtn_Click" Tag="{Binding}"/>
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </Border>
+  </DockPanel>
+</Window>

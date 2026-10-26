@@ -1,0 +1,40 @@
+<Window x:Class="Cutlance.CameraSettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="摄像头采集设置" Height="470" Width="440"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Style="{StaticResource AppWindow}">
+  <Window.Resources>
+    <!-- 下拉项文字统一红色（与主界面一致） -->
+    <Style x:Key="Lbl" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}"/>
+      <Setter Property="Margin" Value="0,10,0,3"/>
+    </Style>
+  </Window.Resources>
+  <StackPanel Margin="14">
+    <TextBlock Text="摄像头设备" Style="{StaticResource Lbl}" Margin="0,0,0,3"/>
+    <ComboBox x:Name="DeviceCombo" Background="{DynamicResource Brush.Bg.Surface}"/>
+
+    <TextBlock Text="分辨率" Style="{StaticResource Lbl}"/>
+    <ComboBox x:Name="ResCombo" Background="{DynamicResource Brush.Bg.Surface}"/>
+
+    <TextBlock Text="帧率" Style="{StaticResource Lbl}"/>
+    <ComboBox x:Name="FpsCombo" Background="{DynamicResource Brush.Bg.Surface}"/>
+
+    <TextBlock Text="采集格式（像素格式）" Style="{StaticResource Lbl}"/>
+    <ComboBox x:Name="FmtCombo" Background="{DynamicResource Brush.Bg.Surface}"/>
+
+    <CheckBox x:Name="AudioChk" Content="同时采集该摄像头音频" Foreground="{DynamicResource Brush.Text}"
+              IsChecked="True" Margin="0,14,0,0"/>
+
+    <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Brush.Text.Muted}" FontSize="10" Margin="0,10,0,0"
+               Text="提示：设为「默认」即交由设备自动协商，兼容性最好。若某组合设备不支持，VLC 会自动回退到最接近的支持项。MJPG 通常可获得更高分辨率/帧率但占用更高。" />
+
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+      <Button Content="取消" Width="90" Height="32" Margin="0,0,10,0"
+              Background="{DynamicResource Brush.Bg.Raised}" Foreground="{DynamicResource Brush.Text}" Click="Cancel_Click"/>
+      <Button Content="确定并添加" Width="120" Height="32"
+              Background="{DynamicResource Brush.Warn}" Foreground="{DynamicResource Brush.Bg.Base}" FontWeight="Bold" Click="Ok_Click"/>
+    </StackPanel>
+  </StackPanel>
+</Window>

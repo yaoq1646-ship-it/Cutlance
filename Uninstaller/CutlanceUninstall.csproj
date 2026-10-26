@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Cutlance 卸载器（老板 2026-10-22：程序不用了，应该能从 Windows 里删掉）。
+
+    为什么要单独一个小 exe，而不是让 setup.exe 兼任卸载：
+      setup.exe 装完**不在安装目录里**（用户随时可能把安装包删了或挪走），
+      注册表把卸载命令指向它，一旦安装包不在，卸载入口就成了死链接。
+      所以安装时随装这一个 ~15KB 的小卸载器到安装目录，
+      注册表 UninstallString 指向它 —— 跟安装包在不在完全无关。
+
+    为什么 net48：与安装器同口径，Win10 1903+/Win11 自带，零前置条件。
+    界面只用 MessageBox：不引 WPF，不拖 XAML，编出来才十几 KB。
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>CutlanceUninstall</AssemblyName>
+    <RootNamespace>CutlanceUninstall</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <DebugType>none</DebugType>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <ApplicationIcon>..\SetupBuilder\Assets\Cutlance.ico</ApplicationIcon>
+    <Company>Cutlance</Company>
+    <Product>Cutlance</Product>
+    <Version>1.0.0</Version>
+    <FileVersion>1.0.0.0</FileVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+  </ItemGroup>
+
+</Project>

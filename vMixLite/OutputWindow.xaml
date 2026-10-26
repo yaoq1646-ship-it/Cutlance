@@ -1,0 +1,231 @@
+﻿<Window x:Class="Cutlance.OutputWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="输出设置 · 推流 / 录制 / HDMI / NDI" Height="690" Width="780"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Style="{StaticResource AppWindow}">
+    <!-- 版式演进（都为了"打开就能看到开始推流按钮"）：
+         1) 高度曾写死 790，而内容实际 1150 DIP → 「NDI 帧率/状态、显卡加速、开始推流」整块落在滚动区外；
+         2) 加宽到 620 只省下 ~60 DIP（说明文字少折行而已），仍超窗 90~118 DIP；
+         3) 改成**左右两列**：左列推流/录制 + 输出引擎 + 输出画面，右列 HDMI + NDI + 显卡加速；
+         4) 【2026-10-16 末】实测两列各自底部（自窗口顶，DIP）：左列 480.7 / 右列 618.0。
+            "开始推流"那行原本横跨两列、**叠在较高的右列之下**，于是总高 = 618 + 底行 ≈ 725 DIP
+            → 1080p@150%（可用高 693 DIP）仍要滚动。把底行改挂**左列底部**后，
+            总高 = max(左列+底行, 右列) = max(574, 618) = **618 DIP**，基准屏免滚动（实测确认）。
+         5) 【2026-10-20】「输出画面」分组（输出分辨率 + 立即重启）整体搬到
+            主界面「视图 → 输出分辨率（重启生效）」子菜单 → 左列矮了约 200 DIP。
+         6) 【2026-10-21 老板：左列下面留一块空白】重排两列，让它派上用场：
+            · 「显卡加速」从右列搬到左列，紧跟「输出引擎」（解码/编码本来就是一件事）；
+            · 「开始推流 / 录制」从"左列底部"挪到右列末尾（主操作放右下是常规位置）；
+            · 结果：左列 552 / 右列 545 DIP（原来 478 / 590，差 112），窗高由 690 收到 **652**
+              （再往下收会出现滚动条：实测 610 / 640 时可滚距离 43 / 0，640 已经零余量，652 留 12 DIP）。
+            实测探针：`CUTLANCE_SHOT_OUTCFG=1` 时日志会打 `[版式] 左列内容底=… 右列内容底=…`。
+         注：主题 Themes/Theme.xaml 的 GroupBox 模板把标题画在边框**上方**（Row0 标题 + Row1 边框），
+             每组额外占 ~21 DIP，这是组间距 31 DIP（而非 Margin 的 8 DIP）的来源。
+         两列各约 370 DIP 宽，说明文字折行适中；窗口由 Services/WindowFit 在小屏上自动收敛。 -->
+  <Window.Resources>
+  </Window.Resources>
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+  <Grid Margin="14">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*"/>
+      <ColumnDefinition Width="*"/>
+    </Grid.ColumnDefinitions>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <!-- ==================== 左列：推流 / 录制 / 引擎 / 画面 / 主操作 ==================== -->
+    <StackPanel x:Name="ColLeft" Grid.Row="0" Grid.Column="0" Margin="0,0,8,0">
+      <TextBlock Text="RTMP 推流地址" Foreground="{DynamicResource Brush.Text}" Margin="0,4"/>
+      <TextBox x:Name="UrlBox" Background="{DynamicResource Brush.Bg.Surface}" Foreground="{DynamicResource Brush.Text}" BorderBrush="{DynamicResource Brush.Border}"/>
+      <CheckBox x:Name="StreamChk" Content="启用推流" Foreground="{DynamicResource Brush.Text}" Margin="0,8,0,0" IsChecked="True"/>
+
+      <TextBlock Text="本地录制文件夹" Foreground="{DynamicResource Brush.Text}" Margin="0,8,0,4"/>
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <TextBox x:Name="FolderBox" Background="{DynamicResource Brush.Bg.Surface}" Foreground="{DynamicResource Brush.Text}" BorderBrush="{DynamicResource Brush.Border}"/>
+        <Button Grid.Column="1" x:Name="BrowseBtn" Content="浏览…" Width="64" Margin="6,0,0,0"
+                Background="{DynamicResource Brush.Bg.Raised}" Foreground="{DynamicResource Brush.Text}" BorderBrush="{DynamicResource Brush.Bg.StatusBar}" BorderThickness="1"
+                Click="BrowseBtn_Click" ToolTip="选择录制文件保存目录"/>
+      </Grid>
+      <!-- 录制容器（2026-10-21 老板要求：这项以前只活在工程文件里，界面改不到）。
+           跟「启用本地录制」放同一行是为了不加高度 —— 窗高刚收到 652，凭空多一行就出滚动条。 -->
+      <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+        <CheckBox x:Name="RecChk" Content="启用本地录制" Foreground="{DynamicResource Brush.Text}"
+                  VerticalAlignment="Center" IsChecked="True"/>
+        <TextBlock Text="格式：" Foreground="{DynamicResource Brush.Text}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+        <ComboBox x:Name="ContainerCombo" Width="150" Background="{DynamicResource Brush.Bg.Surface}"
+                  VerticalAlignment="Center"
+                  ToolTip="mkv 中断也不易坏文件（推荐）；mp4 兼容性好，但断电/强退可能整个文件打不开">
+          <ComboBoxItem Content="mkv（推荐，抗中断）" Tag="mkv"/>
+          <ComboBoxItem Content="mp4（兼容性好）" Tag="mp4"/>
+        </ComboBox>
+      </StackPanel>
+
+      <!-- 分段录制（老板 2026-10-20）：到点自动封包并开始录新文件，不是「到点停」。
+           底层用 ffmpeg 的 segment 分段器，同一进程连续编码只切容器，换段不丢帧不断音。
+           只给时间档不按容量：ffmpeg 8.x 没有按大小切分，按码率折算误差 ±10%，写出来会误导人。 -->
+      <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+        <TextBlock Text="分段录制：" Foreground="{DynamicResource Brush.Text}" VerticalAlignment="Center"/>
+        <ComboBox x:Name="SegCombo" Width="210" Background="{DynamicResource Brush.Bg.Surface}"
+                  SelectionChanged="SegCombo_SelectionChanged"
+                  ToolTip="到达所选时长自动封包并开始录制下一个文件，录制不中断">
+          <ComboBoxItem Content="不分段（单个文件）" Tag="0"/>
+          <ComboBoxItem Content="每 30 分钟换新文件" Tag="1800"/>
+          <ComboBoxItem Content="每 1 小时换新文件" Tag="3600"/>
+          <ComboBoxItem Content="每 2 小时换新文件" Tag="7200"/>
+          <ComboBoxItem Content="每 4 小时换新文件" Tag="14400"/>
+        </ComboBox>
+      </StackPanel>
+
+      <!-- ⚠ 别把长说明塞进 CheckBox 的 Content：主题里 CheckBox 的模板是横向 StackPanel，
+           子元素拿到的是**无限宽**，TextWrapping 永远不生效，超宽就顶到列外被裁掉
+           （原来那句「带麦克风声音（FFmpeg 引擎请用…）」就是这么被切掉半截的）。
+           所以：勾选框只放短标签，说明另起一行 TextBlock（它受列宽约束，能正常换行）。 -->
+      <CheckBox x:Name="MicChk" Content="带麦克风声音" Foreground="{DynamicResource Brush.Text}"
+                Margin="0,6,0,0" IsChecked="True"/>
+      <TextBlock x:Name="MicHint" Text="" Foreground="{DynamicResource Brush.Text.Muted}"
+                 FontSize="10" Margin="0,2,0,0" TextWrapping="Wrap"/>
+
+      <GroupBox Header="输出引擎" Margin="0,8,0,0" Foreground="{DynamicResource Brush.Text}" BorderBrush="{DynamicResource Brush.Border}">
+        <StackPanel Margin="4">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="引擎：" Foreground="{DynamicResource Brush.Text}" VerticalAlignment="Center"/>
+            <ComboBox x:Name="EngineCombo" Width="300" Background="{DynamicResource Brush.Bg.Surface}" SelectionChanged="EngineCombo_SelectionChanged">
+              <!-- 注意：不要在 XAML 里给下拉项写 IsSelected="True"。解析期就会触发 SelectionChanged，
+                   而此时靠后的控件（EngineHint/MixerBtn/FxBtn）还没创建 → 空引用崩溃。
+                   默认选中项改由构造函数里 SelectEngine(_svc.OutputEngine) 指定。 -->
+              <ComboBoxItem Content="FFmpeg（推荐：四路混音 + 美颜美体）" Tag="ffmpeg"/>
+              <ComboBoxItem Content="LibVLC 兼容（仅单路麦克风）" Tag="vlc"/>
+            </ComboBox>
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+            <Button x:Name="MixerBtn" Content="音频混音台…" Width="140" Height="30"
+                    Background="{DynamicResource Brush.Bg.Raised}" Foreground="{DynamicResource Brush.Text}" BorderBrush="{DynamicResource Brush.Bg.StatusBar}" BorderThickness="1"
+                    Click="MixerBtn_Click" ToolTip="最多四路音频采集：选设备 + 独立音量 + 静音，混音后进推流与录制"/>
+            <Button x:Name="FxBtn" Content="画面效果…" Width="130" Height="30" Margin="6,0,0,0"
+                    Background="{DynamicResource Brush.Bg.Raised}" Foreground="{DynamicResource Brush.Text}" BorderBrush="{DynamicResource Brush.Bg.StatusBar}" BorderThickness="1"
+                    Click="FxBtn_Click" ToolTip="调色 / 美白 / 磨皮 / 瘦身 / 拉长（编码器 = NVIDIA NVENC 时启用）"/>
+          </StackPanel>
+          <TextBlock x:Name="EngineHint" Text="" Foreground="{DynamicResource Brush.Text.Muted}" FontSize="10" Margin="0,6,0,0"
+                     TextWrapping="Wrap"/>
+        </StackPanel>
+      </GroupBox>
+
+      <!-- 原「输出画面」分组（输出分辨率 横屏/竖屏 + 立即重启按钮）
+           2026-10-20 老板要求整体搬到「视图 → 输出分辨率（重启生效）」子菜单：
+           同一个功能只留一个入口，避免"窗口里改了、菜单勾没跟上"这类两处打架。 -->
+
+      <!-- 显卡加速（老板 2026-10-21 从右列搬来）：它和「输出引擎」是同一件事的两面（解码/编码），
+           放一起才对；顺带把两列高度拉平（原来左列比右列矮 112 DIP，底部一大块空白）。 -->
+      <GroupBox Header="显卡加速（降低 CPU 占用）" Margin="0,8,0,0" Foreground="{DynamicResource Brush.Text}"
+                BorderBrush="{DynamicResource Brush.Border}">
+        <StackPanel Margin="4">
+          <CheckBox x:Name="HwDecodeChk" Content="播放硬件解码（让显卡解码视频，降低 CPU）"
+                    Foreground="{DynamicResource Brush.Text}" IsChecked="True" Click="HwDecodeChk_Click"/>
+          <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+            <TextBlock Text="推流/录制编码：" Foreground="{DynamicResource Brush.Text}" VerticalAlignment="Center"/>
+            <ComboBox x:Name="EncoderCombo" Width="240" Background="{DynamicResource Brush.Bg.Surface}">
+              <ComboBoxItem Content="NVIDIA NVENC（显卡）" Tag="nvenc"/>
+              <ComboBoxItem Content="软件 x264（最兼容）" Tag="software"/>
+              <ComboBoxItem Content="Intel QuickSync（核显）" Tag="qsv"/>
+            </ComboBox>
+          </StackPanel>
+
+          <!-- 输出帧率 / 视频码率（2026-10-21 老板要求：这两项以前只活在工程文件里，界面改不到）。
+               帧率必须同时喂给合成器和 ffmpeg，否则 25fps 内容会被按 30fps 打时间戳 → 音画错位。 -->
+          <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+            <TextBlock Text="输出帧率：" Foreground="{DynamicResource Brush.Text}" VerticalAlignment="Center"/>
+            <ComboBox x:Name="FpsCombo" Width="88" Background="{DynamicResource Brush.Bg.Surface}"
+                      ToolTip="合成器出帧与推流/录制文件都用这一档。25 = PAL，30 = 网络常用，29.97/59.94 = NTSC">
+              <ComboBoxItem Content="25" Tag="25"/>
+              <ComboBoxItem Content="29.97" Tag="29.97"/>
+              <ComboBoxItem Content="30" Tag="30"/>
+              <ComboBoxItem Content="50" Tag="50"/>
+              <ComboBoxItem Content="59.94" Tag="59.94"/>
+              <ComboBoxItem Content="60" Tag="60"/>
+            </ComboBox>
+            <TextBlock Text="码率：" Foreground="{DynamicResource Brush.Text}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+            <!-- 老板 2026-10-21 第 2 条：码率改成**手动填入**，并给出常用参考档。
+                 刻意不用可编辑 ComboBox：主题模板里没有 PART_EditableTextBox
+                 （Themes/Theme.xaml 的 ComboBox 模板只有 ContentPresenter），
+                 IsEditable=True 在这套皮肤下根本打不了字 —— 实测过，别改回去。 -->
+            <TextBox x:Name="BitrateBox" Width="64" VerticalAlignment="Center"
+                     Background="{DynamicResource Brush.Bg.Surface}" Foreground="{DynamicResource Brush.Text}"
+                     BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1" Padding="5,0"
+                     ToolTip="视频码率（kbps），可手填 500~50000。点右边「参考 ▾」看常用档位直接填"/>
+            <TextBlock Text="kbps" Foreground="{DynamicResource Brush.Text.Muted}" FontSize="10"
+                       VerticalAlignment="Center" Margin="4,0,0,0"/>
+            <Button x:Name="BitrateRefBtn" Content="参考 ▾" Height="24" Padding="8,0" Margin="6,0,0,0"
+                    FontSize="11" VerticalAlignment="Center"
+                    Background="{DynamicResource Brush.Bg.Raised}" Foreground="{DynamicResource Brush.Text}"
+                    BorderBrush="{DynamicResource Brush.Bg.StatusBar}" BorderThickness="1"
+                    Click="BitrateRefBtn_Click"
+                    ToolTip="常用直播码率档位（点一下就填进左边的框）"/>
+          </StackPanel>
+          <TextBlock Text="提示：默认 NVENC 硬编码（大幅降 CPU）；没有 N 卡、启动报错就改选「软件 x264」。硬解黑屏就取消勾选。"
+                     Foreground="{DynamicResource Brush.Text.Muted}" FontSize="10" Margin="0,6,0,0" TextWrapping="Wrap"/>
+        </StackPanel>
+      </GroupBox>
+    </StackPanel>
+
+    <!-- ==================== 右列：HDMI / NDI / 显卡加速 ==================== -->
+    <StackPanel x:Name="ColRight" Grid.Row="0" Grid.Column="1" Margin="8,0,0,0">
+      <GroupBox Header="HDMI 全屏输出（副屏全屏播节目）" Margin="0,4,0,0" Foreground="{DynamicResource Brush.Text}" BorderBrush="{DynamicResource Brush.Border}">
+        <StackPanel Margin="4">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="目标显示器：" Foreground="{DynamicResource Brush.Text}" VerticalAlignment="Center"/>
+            <ComboBox x:Name="HdmiMonitorCombo" Width="240" Background="{DynamicResource Brush.Bg.Surface}"/>
+          </StackPanel>
+          <!-- 老板 2026-10-18：这里不再放开/关按钮，统一到「流」菜单勾选，避免两处入口状态不同步 -->
+          <Border Background="{DynamicResource Brush.Bg.Sunken}" BorderBrush="{DynamicResource Brush.Border}"
+                  BorderThickness="1" Padding="8,6" Margin="0,8,0,0">
+            <TextBlock Text="请在「流」菜单里打钩「HDMI 全屏输出」"
+                       Foreground="{DynamicResource Brush.Accent}" FontWeight="Bold" TextWrapping="Wrap"/>
+          </Border>
+          <TextBlock x:Name="HdmiStatus" Text="未开启" Foreground="{DynamicResource Brush.Text.Secondary}" Margin="0,8,0,0" TextWrapping="Wrap"/>
+          <TextBlock Text="把节目画面全屏播到所选显示器（即 HDMI/DP 口外接的那块屏，需在系统「显示设置」里设为「扩展」）。画面走内存成品帧，主窗口是否被挡、是否最小化都不影响。"
+                     Foreground="{DynamicResource Brush.Text.Muted}" FontSize="10" Margin="0,6,0,0" TextWrapping="Wrap"/>
+        </StackPanel>
+      </GroupBox>
+
+      <GroupBox Header="NDI 输出（把节目画面广播到局域网）" Margin="0,8,0,0" Foreground="{DynamicResource Brush.Text}" BorderBrush="{DynamicResource Brush.Border}">
+        <StackPanel Margin="4">
+          <CheckBox x:Name="NdiChk" Content="启用 NDI 输出" Foreground="{DynamicResource Brush.Text}" Click="NdiChk_Click"/>
+          <TextBlock Text="NDI 源名（留空 = Cutlance Output (主机名)）" Foreground="{DynamicResource Brush.Text}" Margin="0,8,0,4"/>
+          <TextBox x:Name="NdiNameBox" Background="{DynamicResource Brush.Bg.Surface}" Foreground="{DynamicResource Brush.Text}" BorderBrush="{DynamicResource Brush.Border}"/>
+          <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+            <TextBlock Text="广播帧率：" Foreground="{DynamicResource Brush.Text}" VerticalAlignment="Center"/>
+            <ComboBox x:Name="NdiFpsCombo" Width="180" Background="{DynamicResource Brush.Bg.Surface}">
+              <ComboBoxItem Content="跟随输出帧率" Tag="0"/>
+              <ComboBoxItem Content="30 fps" Tag="30"/>
+              <ComboBoxItem Content="25 fps" Tag="25"/>
+              <ComboBoxItem Content="60 fps" Tag="60"/>
+            </ComboBox>
+          </StackPanel>
+          <TextBlock x:Name="NdiStatus" Text="未开启" Foreground="{DynamicResource Brush.Text.Secondary}" Margin="0,8,0,0" TextWrapping="Wrap"/>
+          <TextBlock Text="NDI 与推流/录制同源（取同一份内存成品帧），可以只开 NDI，也可以同时开。局域网里别的机器用 NDI Studio Monitor / OBS / vMix 就能看到这个源。NDI 走帧内压缩、无重编码，1080p60 约占 100~150 Mbps 内网带宽。"
+                     Foreground="{DynamicResource Brush.Text.Muted}" FontSize="10" Margin="0,6,0,0" TextWrapping="Wrap"/>
+        </StackPanel>
+      </GroupBox>
+
+      <!-- ============ 主操作（2026-10-21 从"左列底部"挪到右列末尾）============
+           为什么挪：左列比右列矮 112 DIP，底部留一块空白，看着像少了东西。
+           把「显卡加速」搬去左列（和输出引擎同组）后左列变高、右列变矮，
+           再把这块主操作挂到右列末尾，两列就齐平（实测 523 vs 545 DIP）。
+           按钮仍在本窗内、不跨列，窗高还能比原来收 90 DIP。 -->
+      <StackPanel Margin="0,14,0,0">
+        <Button x:Name="ToggleBtn" Content="开始推流 / 录制" Width="220" Height="34"
+                Background="{DynamicResource Brush.Warn}" Foreground="{DynamicResource Brush.Bg.Base}" FontWeight="Bold" Click="ToggleBtn_Click" HorizontalAlignment="Center"/>
+        <TextBlock x:Name="StatusLbl" Text="就绪" Foreground="{DynamicResource Brush.Text.Secondary}" Margin="0,8,0,0" TextWrapping="Wrap"/>
+        <TextBlock Text="提示：改由内存合成器出图后，推流/录制不再依赖屏幕上的播出框（最小化、被其它窗口挡住都不影响）。"
+                   Foreground="{DynamicResource Brush.Text.Muted}" FontSize="10" Margin="0,6,0,0" TextWrapping="Wrap"/>
+      </StackPanel>
+    </StackPanel>
+  </Grid>
+  </ScrollViewer>
+</Window>
