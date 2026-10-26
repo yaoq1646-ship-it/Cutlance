@@ -1,0 +1,39 @@
+name: build
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    # WPF / WinForms 目标需要 Windows 运行器
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore vMixLite/Cutlance.csproj
+
+      - name: Build (Release)
+        run: dotnet build vMixLite/Cutlance.csproj -c Release --no-restore -warnaserror-:CS1591
+
+      - name: Publish (self-contained win-x64)
+        run: >
+          dotnet publish vMixLite/Cutlance.csproj
+          -c Release -r win-x64 --self-contained -o dist/Cutlance
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Cutlance-win-x64
+          path: dist/Cutlance/
+          retention-days: 7
