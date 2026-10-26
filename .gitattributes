@@ -1,0 +1,15 @@
+# 统一换行符：源码按平台，脚本固定 CRLF
+* text=auto
+
+*.cs        text
+*.xaml      text
+*.csproj    text
+*.md        text
+*.cmd       text eol=crlf
+*.bat       text eol=crlf
+*.manifest  text
+
+*.png       binary
+*.ico       binary
+*.dll       binary
+*.exe       binary
